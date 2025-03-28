@@ -1,0 +1,7 @@
+package-lock.json
+Cargo.lock
+*.pyc
+build/
+dist/
+*.exe
+*/src-tauri/flask_server/

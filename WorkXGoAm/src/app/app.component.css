@@ -110,3 +110,26 @@ button {
     background-color: #0f0f0f69;
   }
 }
+
+.server-info {
+  margin-top: 2rem;
+  padding: 1rem;
+  border: 1px solid #ccc;
+  border-radius: 0.5rem;
+  background-color: #f9f9f9;
+}
+
+.server-info h3 {
+  margin-top: 0;
+  margin-bottom: 1rem;
+}
+
+.online {
+  color: green;
+  font-weight: bold;
+}
+
+.offline {
+  color: red;
+  font-weight: bold;
+}
