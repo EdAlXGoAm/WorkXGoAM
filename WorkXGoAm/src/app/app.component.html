@@ -1,11 +1,1 @@
-<!-- Component where Tauri and frontend communicate -->
-<main class="container">
-  <h1>WorkX</h1>
-
-  <div class="server-info">
-    <h3>Flask Server Information</h3>
-    <p>Status: <span [class.online]="serverStatus" [class.offline]="!serverStatus">
-      {{ serverStatus ? 'Online' : 'Disconnected' }}
-    </span></p>
-  </div>
-</main>
+<router-outlet></router-outlet>

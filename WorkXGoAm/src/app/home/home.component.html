@@ -1,0 +1,15 @@
+<main class="container">
+  <h1 class="title">WorkX</h1>
+
+  <!-- Icon to navigate to TestWindow -->
+  <div class="navigation-icon" routerLink="/test-window">
+    <img src="assets/png_icons/test.png" alt="Ir a Test Window">
+  </div>
+
+  <footer class="server-info">
+    <h3>Flask Server Information</h3>
+    <p>Status: <span [class.online]="serverStatus" [class.offline]="!serverStatus">
+      {{ serverStatus ? 'Online' : 'Disconnected' }}
+    </span></p>
+  </footer>
+</main> 
