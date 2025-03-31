@@ -8,7 +8,7 @@ import { invoke } from '@tauri-apps/api/core';
   providedIn: 'root'
 })
 export class ApiService {
-  private apiBaseUrl = 'http://127.0.0.1:8080'; // Puerto por defecto
+  private apiBaseUrl = 'http://127.0.0.1:8080'; // Default port
   private apiReadyPromise: Promise<string>;
 
   constructor(private http: HttpClient) {
@@ -16,41 +16,41 @@ export class ApiService {
   }
 
   /**
-   * Carga la información del puerto del servidor desde el archivo server-port.json
+   * Loads the server port information from the server-port.json file
    */
   private async loadServerPort(): Promise<string> {
     try {
-      // Obtenemos la ruta de %LOCALAPPDATA%
+      // Get %LOCALAPPDATA% path
       const localAppData = await invoke<string>('get_env', { variable: 'LOCALAPPDATA' });
       const configPath = `${localAppData}\\WorkXGoAm\\server-port.json`;
       
-      // Leemos el archivo
+      // Read the file
       const portConfig = await invoke<string>('read_file', { path: configPath });
       const { port } = JSON.parse(portConfig);
       
       this.apiBaseUrl = `http://127.0.0.1:${port}`;
-      console.log(`API configurada en: ${this.apiBaseUrl}`);
+      console.log(`API configured at: ${this.apiBaseUrl}`);
       
-      // Mostrar alerta con la dirección del servidor
+      // Show alert with the server address
       // alert(`Servidor WorkXGoAm configurado en: ${this.apiBaseUrl}`);
       return this.apiBaseUrl;
     } catch (error) {
-      console.error('Error al leer el puerto del servidor:', error);
-      // En caso de error usamos el puerto por defecto
-      alert(`Servidor WorkXGoAm configurado en el puerto por defecto: ${this.apiBaseUrl}`);
+      console.error('Error reading server port:', error);
+      // In case of error, use the default port
+      // alert(`Servidor WorkXGoAm configured at the default port: ${this.apiBaseUrl}`);
       return this.apiBaseUrl;
     }
   }
 
   /**
-   * Obtiene la URL base del API asegurando que está inicializada
+   * Gets the base API URL ensuring it is initialized
    */
   private getApiUrl(): Observable<string> {
     return from(this.apiReadyPromise);
   }
 
   /**
-   * Verifica la salud del servidor
+   * Checks the server health
    */
   checkHealth(): Observable<boolean> {
     return this.getApiUrl().pipe(
@@ -58,22 +58,6 @@ export class ApiService {
         this.http.get<{status: string}>(`${baseUrl}/api/health`).pipe(
           map(response => response.status === 'healthy'),
           catchError(() => of(false))
-        )
-      )
-    );
-  }
-
-  /**
-   * Ejemplo de método para llamar al endpoint hello
-   */
-  getHello(): Observable<{message: string}> {
-    return this.getApiUrl().pipe(
-      switchMap(baseUrl => 
-        this.http.get<{message: string}>(`${baseUrl}/api/hello`).pipe(
-          catchError(error => {
-            console.error('Error al obtener mensaje de saludo:', error);
-            return of({ message: 'Error al conectar con el servidor' });
-          })
         )
       )
     );

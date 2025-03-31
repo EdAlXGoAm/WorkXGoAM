@@ -99,11 +99,6 @@ fn get_app_data_dir() -> Result<PathBuf, String> {
 }
 
 #[tauri::command]
-fn greet(name: &str) -> String {
-    format!("Hello, {}! You've been greeted from Rust!", name)
-}
-
-#[tauri::command]
 fn read_file(path: &str) -> Result<String, String> {
     std::fs::read_to_string(path).map_err(|e| e.to_string())
 }
@@ -218,7 +213,7 @@ pub fn run() {
             }
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![greet, read_file, get_env])
+        .invoke_handler(tauri::generate_handler![read_file, get_env])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

@@ -1,28 +1,11 @@
 <!-- Component where Tauri and frontend communicate -->
 <main class="container">
-  <h1>Welcome to Tauri + Angular!</h1>
-
-  <div class="row">
-    <a href="https://tauri.app" target="_blank">
-      <img id="tauri-logo" src="assets/tauri.svg" class="logo tauri" alt="Tauri logo" />
-    </a>
-    <a href="https://angular.io" target="_blank">
-      <img id="angular-logo" src="assets/angular.svg" class="logo angular" alt="Angular logo" />
-    </a>
-  </div>
-  <p>Click on the logos to learn more about the frameworks</p>
-
-  <form class="row" (submit)="greet($event, greetInput.value)">
-    <input #greetInput id="greet-input" placeholder="Enter a name..." autocomplete="off" />
-    <button type="submit">Greet</button>
-  </form>
-  <p>{{ greetingMessage }}</p>
+  <h1>WorkX</h1>
 
   <div class="server-info">
     <h3>Flask Server Information</h3>
     <p>Status: <span [class.online]="serverStatus" [class.offline]="!serverStatus">
       {{ serverStatus ? 'Online' : 'Disconnected' }}
     </span></p>
-    <p>Server message: {{ serverMessage }}</p>
   </div>
 </main>
