@@ -7,4 +7,31 @@
   <h1>Test Window</h1>
   <p>{{ dataFromService }}</p>
 
+  <mat-card class="audio-devices-card">
+    <mat-card-header>
+      <mat-card-title>Dispositivos de Audio</mat-card-title>
+    </mat-card-header>
+    <mat-card-content>
+      <button mat-raised-button color="primary" (click)="getAudioDevices()">
+        Obtener Dispositivos
+      </button>
+
+      <mat-form-field appearance="fill" class="device-select">
+        <mat-label>Seleccionar dispositivo</mat-label>
+        <mat-select [(ngModel)]="selectedDevice">
+          <mat-option *ngFor="let device of audioDevices" [value]="device.id">
+            {{device.name}}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <!-- Debug info -->
+      <div *ngIf="audioDevices.length === 0" style="margin-top: 10px; color: #666;">
+        No hay dispositivos disponibles
+      </div>
+      <div *ngIf="audioDevices.length > 0" style="margin-top: 10px; color: #666;">
+        {{audioDevices.length}} dispositivos encontrados
+      </div>
+    </mat-card-content>
+  </mat-card>
 </div> 
