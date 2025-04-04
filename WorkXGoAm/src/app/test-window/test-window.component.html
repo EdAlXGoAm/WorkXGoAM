@@ -32,6 +32,32 @@
       <div *ngIf="audioDevices.length > 0" style="margin-top: 10px; color: #666;">
         {{audioDevices.length}} dispositivos encontrados
       </div>
+      
+      <!-- Controles de grabación -->
+      <div class="recording-controls">
+        <button mat-raised-button color="primary"
+                [disabled]="isRecording || isRecording10Secs || !selectedDevice"
+                (click)="record10Seconds()">
+          Grabar 10 Segundos
+        </button>
+      </div>
+      
+      <!-- Estado y mensajes -->
+      <div class="status-message" [ngClass]="{'recording': isRecording || isRecording10Secs}">
+        {{ statusMessage }}
+      </div>
+      
+      <div *ngIf="isRecording" class="recording-indicator">
+        Grabando...
+      </div>
+      
+      <div *ngIf="isRecording10Secs" class="recording-indicator">
+        Grabando 10 segundos...
+      </div>
+      
+      <div *ngIf="lastCapturedFile" class="file-info">
+        Último archivo: {{ lastCapturedFile }}
+      </div>
     </mat-card-content>
   </mat-card>
 </div> 

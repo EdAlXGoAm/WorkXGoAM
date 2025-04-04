@@ -5,3 +5,6 @@ build/
 dist/
 *.exe
 */src-tauri/flask_server/
+WorkXGoAm/cargo_test/hello/target/
+WorkXGoAm/cargo_test/hello/
+WorkXGoAm/rust_libs/
