@@ -1,9 +1,10 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-use std::fs::{remove_file, File};
+use std::fs::{remove_file, File, read_dir};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command};
 use std::sync::Mutex;
 use tauri::Manager;
+use tauri::Emitter;
 use chrono::Local;
 use wasapi::{DeviceCollection, Direction};
 use serde::Serialize;
@@ -22,6 +23,16 @@ struct AudioDevice {
 
 // Structure to store the Python server process
 struct PythonProcess {
+    child: Mutex<Option<Child>>,
+}
+
+// Estructuras para almacenar los procesos de los scripts de Python wav_monitor
+struct WavMonitorProcess {
+    child: Mutex<Option<Child>>,
+}
+
+// Estructuras para almacenar los procesos de los scripts de Python wav_monitor_gui
+struct WavMonitorGuiProcess {
     child: Mutex<Option<Child>>,
 }
 
@@ -260,9 +271,91 @@ fn get_device_by_id(deviceid: &str) -> Result<Device, WasapiError> {
     Err(WasapiError::DeviceNotFound(deviceid.to_string()))
 }
 
+struct ContinuousRecordingState {
+    is_recording: bool,
+    stop_signal: Mutex<bool>,
+}
+
 #[tauri::command]
-fn record_10_secs(deviceid: String) -> Result<String, String> {
-    info!("Iniciando record_10_secs con dispositivo ID: {}", deviceid);
+fn start_continuous_recording(deviceid: String, app_handle: tauri::AppHandle) -> Result<(), String> {
+    info!("Iniciando grabación continua con dispositivo ID: {}", deviceid);
+    
+    // Creamos el estado de grabación continua
+    let recording_state = ContinuousRecordingState {
+        is_recording: true,
+        stop_signal: Mutex::new(false),
+    };
+    
+    // Lo convertimos en un Arc para compartirlo entre hilos
+    let recording_state = std::sync::Arc::new(recording_state);
+    let recording_state_clone = recording_state.clone();
+    
+    // Clonamos el app_handle para usar en el hilo
+    let app_handle_clone = app_handle.clone();
+    
+    // Lanzamos la grabación continua en un hilo separado
+    std::thread::spawn(move || {
+        info!("Hilo de grabación continua iniciado");
+        
+        // Notificar que la grabación continua ha comenzado
+        app_handle_clone.emit("continuous_recording_started", ()).unwrap_or_default();
+        
+        let mut count = 0;
+        
+        // Bucle de grabación continua
+        while !*recording_state_clone.stop_signal.lock().unwrap() {
+            info!("Iniciando grabación #{} en modo continuo", count + 1);
+            
+            // Ejecutamos record_10_secs_internal directamente sin catch_unwind
+            let result = record_10_secs_internal(deviceid.clone(), app_handle_clone.clone());
+            
+            if let Err(e) = &result {
+                error!("Error en grabación continua: {}", e);
+                app_handle_clone.emit("continuous_recording_error", e).unwrap_or_default();
+                break;
+            }
+            
+            count += 1;
+            
+            // Verificamos si debemos detener la grabación
+            if *recording_state_clone.stop_signal.lock().unwrap() {
+                break;
+            }
+            
+            // Emitimos evento con el número de grabaciones completadas
+            app_handle_clone.emit("continuous_recording_progress", count).unwrap_or_default();
+        }
+        
+        info!("Grabación continua detenida después de {} grabaciones", count);
+        app_handle_clone.emit("continuous_recording_stopped", count).unwrap_or_default();
+    });
+    
+    // Guardamos el estado en el estado de la aplicación para poder detenerlo después
+    app_handle.manage(recording_state);
+    
+    Ok(())
+}
+
+#[tauri::command]
+fn stop_continuous_recording(app_handle: tauri::AppHandle) -> Result<(), String> {
+    info!("Deteniendo grabación continua");
+    
+    // Obtenemos el estado de grabación del estado de la aplicación
+    if let Some(state) = app_handle.try_state::<std::sync::Arc<ContinuousRecordingState>>() {
+        // Establecemos la señal de parada
+        *state.stop_signal.lock().unwrap() = true;
+        info!("Señal de parada enviada a la grabación continua");
+        Ok(())
+    } else {
+        let err_msg = "No hay grabación continua en curso".to_string();
+        error!("{}", err_msg);
+        Err(err_msg)
+    }
+}
+
+// Versión interna de record_10_secs para llamarla desde start_continuous_recording
+fn record_10_secs_internal(deviceid: String, app_handle: tauri::AppHandle) -> Result<(), String> {
+    info!("Iniciando record_10_secs_internal con dispositivo ID: {}", deviceid);
     
     // En Tauri, asumimos que COM ya está inicializado por el framework
     info!("Asumiendo que COM ya está inicializado por Tauri");
@@ -277,6 +370,7 @@ fn record_10_secs(deviceid: String) -> Result<String, String> {
         Err(e) => {
             let err_msg = format!("Error al obtener el dispositivo: {:?}", e);
             error!("{}", err_msg);
+            app_handle.emit("recording_error", err_msg.clone()).unwrap_or_default();
             return Err(err_msg);
         }
     };
@@ -290,6 +384,7 @@ fn record_10_secs(deviceid: String) -> Result<String, String> {
         Err(e) => {
             let err_msg = format!("Error al obtener IAudioClient: {:?}", e);
             error!("{}", err_msg);
+            app_handle.emit("recording_error", err_msg.clone()).unwrap_or_default();
             return Err(err_msg);
         }
     };
@@ -307,6 +402,7 @@ fn record_10_secs(deviceid: String) -> Result<String, String> {
         Err(e) => {
             let err_msg = format!("Error al obtener períodos: {:?}", e);
             error!("{}", err_msg);
+            app_handle.emit("recording_error", err_msg.clone()).unwrap_or_default();
             return Err(err_msg);
         }
     };
@@ -324,6 +420,7 @@ fn record_10_secs(deviceid: String) -> Result<String, String> {
         Err(e) => {
             let err_msg = format!("Error al inicializar cliente de audio: {:?}", e);
             error!("{}", err_msg);
+            app_handle.emit("recording_error", err_msg.clone()).unwrap_or_default();
             return Err(err_msg);
         }
     };
@@ -338,6 +435,7 @@ fn record_10_secs(deviceid: String) -> Result<String, String> {
         Err(e) => {
             let err_msg = format!("Error al configurar event handle: {:?}", e);
             error!("{}", err_msg);
+            app_handle.emit("recording_error", err_msg.clone()).unwrap_or_default();
             return Err(err_msg);
         }
     };
@@ -352,6 +450,7 @@ fn record_10_secs(deviceid: String) -> Result<String, String> {
         Err(e) => {
             let err_msg = format!("Error al obtener cliente de captura: {:?}", e);
             error!("{}", err_msg);
+            app_handle.emit("recording_error", err_msg.clone()).unwrap_or_default();
             return Err(err_msg);
         }
     };
@@ -362,9 +461,13 @@ fn record_10_secs(deviceid: String) -> Result<String, String> {
         Err(e) => {
             let err_msg = format!("Error al iniciar stream de audio: {:?}", e);
             error!("{}", err_msg);
+            app_handle.emit("recording_error", err_msg.clone()).unwrap_or_default();
             return Err(err_msg);
         }
     };
+    
+    // Notificar que la grabación ha comenzado
+    app_handle.emit("recording_started", ()).unwrap_or_default();
     
     let start = Instant::now();
     let mut captured_data = Vec::new();
@@ -380,12 +483,17 @@ fn record_10_secs(deviceid: String) -> Result<String, String> {
                     while let Some(byte) = sample_queue.pop_front() {
                         captured_data.push(byte);
                     }
+                    
+                    // Enviar progreso a la interfaz
+                    let progress = start.elapsed().as_secs_f32() / 10.0 * 100.0;
+                    app_handle.emit("recording_progress", progress).unwrap_or_default();
                 },
                 Err(e) => {
                     let err_msg = format!("Error al leer datos de audio: {:?}", e);
                     error!("{}", err_msg);
                     // Intentamos detener el stream antes de retornar el error
                     let _ = audio_client.stop_stream();
+                    app_handle.emit("recording_error", err_msg.clone()).unwrap_or_default();
                     return Err(err_msg);
                 }
             }
@@ -398,6 +506,7 @@ fn record_10_secs(deviceid: String) -> Result<String, String> {
         Err(e) => {
             let err_msg = format!("Error al detener stream de audio: {:?}", e);
             error!("{}", err_msg);
+            app_handle.emit("recording_error", err_msg.clone()).unwrap_or_default();
             return Err(err_msg);
         }
     };
@@ -414,6 +523,7 @@ fn record_10_secs(deviceid: String) -> Result<String, String> {
         Err(e) => {
             let err_msg = format!("Error al crear archivo: {}", e);
             error!("{}", err_msg);
+            app_handle.emit("recording_error", err_msg.clone()).unwrap_or_default();
             return Err(err_msg);
         }
     };
@@ -426,6 +536,7 @@ fn record_10_secs(deviceid: String) -> Result<String, String> {
         Err(e) => {
             let err_msg = format!("Error al escribir encabezado WAV: {}", e);
             error!("{}", err_msg);
+            app_handle.emit("recording_error", err_msg.clone()).unwrap_or_default();
             return Err(err_msg);
         }
     };
@@ -435,12 +546,184 @@ fn record_10_secs(deviceid: String) -> Result<String, String> {
         Err(e) => {
             let err_msg = format!("Error al escribir datos de audio: {}", e);
             error!("{}", err_msg);
+            app_handle.emit("recording_error", err_msg.clone()).unwrap_or_default();
             return Err(err_msg);
         }
     };
     
     info!("Grabación completada exitosamente: {}", filename);
-    Ok(filename)
+    // Notificar que la grabación ha terminado con éxito
+    app_handle.emit("recording_finished", filename).unwrap_or_default();
+    
+    Ok(())
+}
+
+#[tauri::command]
+fn record_10_secs(deviceid: String, app_handle: tauri::AppHandle) -> Result<(), String> {
+    info!("Iniciando record_10_secs con dispositivo ID: {}", deviceid);
+    
+    // Clonamos el app_handle para poder usarlo en el hilo
+    let app_handle_clone = app_handle.clone();
+    
+    // Lanzamos la grabación en un hilo separado
+    std::thread::spawn(move || {
+        info!("Hilo de grabación iniciado");
+        
+        let result = record_10_secs_internal(deviceid, app_handle_clone);
+        if let Err(e) = result {
+            error!("Error en record_10_secs: {}", e);
+        }
+    });
+    
+    // Retornamos inmediatamente para no bloquear la interfaz
+    Ok(())
+}
+
+#[tauri::command]
+fn read_transcription_file(path: &str) -> Result<String, String> {
+    std::fs::read_to_string(path).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn get_transcription_files() -> Result<Vec<String>, String> {
+    // Obtiene el directorio actual donde se ejecuta la aplicación
+    let current_dir = std::env::current_dir().map_err(|e| e.to_string())?;
+    
+    // Lee todos los archivos en el directorio actual
+    let entries = read_dir(current_dir).map_err(|e| e.to_string())?;
+    
+    // Filtra solo los archivos .txt y ordénalos por fecha de modificación (más reciente primero)
+    let mut txt_files: Vec<(PathBuf, std::time::SystemTime)> = Vec::new();
+    
+    for entry in entries {
+        let entry = entry.map_err(|e| e.to_string())?;
+        let path = entry.path();
+        
+        // Verifica si es un archivo .txt
+        if path.is_file() && path.extension().map_or(false, |ext| ext == "txt") {
+            // Obtiene la fecha de modificación
+            if let Ok(metadata) = entry.metadata() {
+                if let Ok(modified) = metadata.modified() {
+                    txt_files.push((path, modified));
+                }
+            }
+        }
+    }
+    
+    // Ordena por fecha de modificación (más reciente primero)
+    txt_files.sort_by(|a, b| b.1.cmp(&a.1));
+    
+    // Convierte las rutas a cadenas
+    let paths: Vec<String> = txt_files
+        .into_iter()
+        .map(|(path, _)| path.to_string_lossy().to_string())
+        .collect();
+    
+    Ok(paths)
+}
+
+// Función para iniciar el script wav_monitor.py en una terminal visible
+fn start_wav_monitor() -> Result<Child, String> {
+    // Usar la ruta absoluta donde se encuentran los scripts
+    let script_path = Path::new("D:\\git-edalx\\WorkXGoAm\\WorkXGoAm\\src-tauri\\wav_monitor.py");
+    
+    info!("Intentando ejecutar el script de Python: {:?}", script_path);
+    
+    #[cfg(target_os = "windows")]
+    {
+        // En Windows, usamos cmd para abrir una nueva terminal con el script
+        let mut cmd = Command::new("cmd");
+        cmd.args(&["/c", "start", "cmd", "/k", "python"]);
+        cmd.arg(script_path);
+        
+        // Ejecutar el comando
+        let child = cmd.spawn().map_err(|e| format!("Error al iniciar wav_monitor.py: {}", e))?;
+        info!("Script wav_monitor.py iniciado correctamente");
+        Ok(child)
+    }
+    
+    #[cfg(target_os = "linux")]
+    {
+        // En Linux, podemos usar xterm o gnome-terminal
+        let mut cmd = Command::new("gnome-terminal");
+        cmd.args(&["--", "python"]);
+        cmd.arg(script_path);
+        
+        // Ejecutar el comando
+        let child = cmd.spawn().map_err(|e| format!("Error al iniciar wav_monitor.py: {}", e))?;
+        info!("Script wav_monitor.py iniciado correctamente");
+        Ok(child)
+    }
+    
+    #[cfg(target_os = "macos")]
+    {
+        // En macOS, podemos usar Terminal.app
+        let mut cmd = Command::new("open");
+        cmd.args(&["-a", "Terminal"]);
+        cmd.arg(script_path);
+        
+        // Ejecutar el comando
+        let child = cmd.spawn().map_err(|e| format!("Error al iniciar wav_monitor.py: {}", e))?;
+        info!("Script wav_monitor.py iniciado correctamente");
+        Ok(child)
+    }
+    
+    #[cfg(not(any(target_os = "windows", target_os = "linux", target_os = "macos")))]
+    {
+        Err("Sistema operativo no soportado para iniciar el script wav_monitor.py".to_string())
+    }
+}
+
+// Función para iniciar el script wav_monitor_gui.py en una terminal visible
+fn start_wav_monitor_gui() -> Result<Child, String> {
+    // Usar la ruta absoluta donde se encuentran los scripts
+    let script_path = Path::new("D:\\git-edalx\\WorkXGoAm\\WorkXGoAm\\src-tauri\\wav_monitor_gui.py");
+    
+    info!("Intentando ejecutar el script de Python: {:?}", script_path);
+    
+    #[cfg(target_os = "windows")]
+    {
+        // En Windows, usamos cmd para abrir una nueva terminal con el script
+        let mut cmd = Command::new("cmd");
+        cmd.args(&["/c", "start", "cmd", "/k", "python"]);
+        cmd.arg(script_path);
+        
+        // Ejecutar el comando
+        let child = cmd.spawn().map_err(|e| format!("Error al iniciar wav_monitor_gui.py: {}", e))?;
+        info!("Script wav_monitor_gui.py iniciado correctamente");
+        Ok(child)
+    }
+    
+    #[cfg(target_os = "linux")]
+    {
+        // En Linux, podemos usar xterm o gnome-terminal
+        let mut cmd = Command::new("gnome-terminal");
+        cmd.args(&["--", "python"]);
+        cmd.arg(script_path);
+        
+        // Ejecutar el comando
+        let child = cmd.spawn().map_err(|e| format!("Error al iniciar wav_monitor_gui.py: {}", e))?;
+        info!("Script wav_monitor_gui.py iniciado correctamente");
+        Ok(child)
+    }
+    
+    #[cfg(target_os = "macos")]
+    {
+        // En macOS, podemos usar Terminal.app
+        let mut cmd = Command::new("open");
+        cmd.args(&["-a", "Terminal"]);
+        cmd.arg(script_path);
+        
+        // Ejecutar el comando
+        let child = cmd.spawn().map_err(|e| format!("Error al iniciar wav_monitor_gui.py: {}", e))?;
+        info!("Script wav_monitor_gui.py iniciado correctamente");
+        Ok(child)
+    }
+    
+    #[cfg(not(any(target_os = "windows", target_os = "linux", target_os = "macos")))]
+    {
+        Err("Sistema operativo no soportado para iniciar el script wav_monitor_gui.py".to_string())
+    }
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -477,9 +760,32 @@ pub fn run() {
                     Err(e) => eprintln!("Error starting WorkXFlaskServer: {:?}", e),
                 }
             }
+            
+            // Iniciar wav_monitor.py en una terminal visible
+            match start_wav_monitor() {
+                Ok(child) => {
+                    println!("wav_monitor.py started successfully.");
+                    app.manage(WavMonitorProcess {
+                        child: Mutex::new(Some(child)),
+                    });
+                }
+                Err(e) => eprintln!("Error starting wav_monitor.py: {:?}", e),
+            }
+            
+            // Iniciar wav_monitor_gui.py en una terminal visible
+            match start_wav_monitor_gui() {
+                Ok(child) => {
+                    println!("wav_monitor_gui.py started successfully.");
+                    app.manage(WavMonitorGuiProcess {
+                        child: Mutex::new(Some(child)),
+                    });
+                }
+                Err(e) => eprintln!("Error starting wav_monitor_gui.py: {:?}", e),
+            }
+            
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![read_file, get_env, get_audio_devices, record_10_secs])
+        .invoke_handler(tauri::generate_handler![read_file, get_env, get_audio_devices, record_10_secs, start_continuous_recording, stop_continuous_recording, read_transcription_file, get_transcription_files])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
