@@ -36,14 +36,26 @@
       <!-- Controles de grabación -->
       <div class="recording-controls">
         <button mat-raised-button color="primary"
-                [disabled]="isRecording || isRecording10Secs || !selectedDevice"
+                [disabled]="isRecording || isRecording10Secs || isContinuousRecording || !selectedDevice"
                 (click)="record10Seconds()">
           Grabar 10 Segundos
+        </button>
+        
+        <button mat-raised-button color="accent"
+                [disabled]="isRecording || isRecording10Secs || isContinuousRecording || !selectedDevice"
+                (click)="startContinuousRecording()">
+          Iniciar Grabación Continua
+        </button>
+        
+        <button mat-raised-button color="warn"
+                [disabled]="!isContinuousRecording"
+                (click)="stopContinuousRecording()">
+          Detener Grabación Continua
         </button>
       </div>
       
       <!-- Estado y mensajes -->
-      <div class="status-message" [ngClass]="{'recording': isRecording || isRecording10Secs}">
+      <div class="status-message" [ngClass]="{'recording': isRecording || isRecording10Secs || isContinuousRecording}">
         {{ statusMessage }}
       </div>
       
@@ -52,11 +64,30 @@
       </div>
       
       <div *ngIf="isRecording10Secs" class="recording-indicator">
-        Grabando 10 segundos...
+        Grabando 10 segundos... ({{ recordingProgress | number:'1.0-0' }}%)
+      </div>
+      
+      <div *ngIf="isContinuousRecording" class="recording-indicator">
+        Grabación continua en curso ({{ continuousRecordingCount }} archivos generados)
       </div>
       
       <div *ngIf="lastCapturedFile" class="file-info">
         Último archivo: {{ lastCapturedFile }}
+      </div>
+    </mat-card-content>
+  </mat-card>
+  
+  <!-- Contenedor de transcripciones -->
+  <mat-card class="transcription-card">
+    <mat-card-header>
+      <mat-card-title>Transcripciones de Audio</mat-card-title>
+    </mat-card-header>
+    <mat-card-content>
+      <div class="transcription-container" #transcriptionContainer>
+        <pre *ngIf="transcriptions">{{ transcriptions }}</pre>
+        <div *ngIf="!transcriptions" class="no-transcriptions">
+          No hay transcripciones disponibles. Las transcripciones aparecerán aquí cuando estén disponibles.
+        </div>
       </div>
     </mat-card-content>
   </mat-card>
