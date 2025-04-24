@@ -1,0 +1,23 @@
+<main class="container">
+  <h1>Video Cutter</h1>
+  <div class="form-group">
+    <button (click)="selectInputVideo()">Seleccionar Video de Entrada</button>
+    <p *ngIf="inputPath">Ruta: {{ inputPath }}</p>
+  </div>
+  <div class="form-group">
+    <label>Inicio (segundos):</label>
+    <input type="number" [(ngModel)]="startTime" min="0" />
+    <label>Fin (segundos):</label>
+    <input type="number" [(ngModel)]="endTime" min="0" />
+  </div>
+  <div class="form-group">
+    <button (click)="selectOutputLocation()">Seleccionar Ubicación de Salida</button>
+    <p *ngIf="outputPath">Ruta Salida: {{ outputPath }}</p>
+  </div>
+  <div class="form-group">
+    <button (click)="cutVideo()" [disabled]="isProcessing">Recortar Video</button>
+  </div>
+  <div class="result-message" *ngIf="resultMessage">
+    {{ resultMessage }}
+  </div>
+</main> 

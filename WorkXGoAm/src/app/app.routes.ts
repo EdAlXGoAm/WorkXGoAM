@@ -11,6 +11,11 @@ export const routes: Routes = [
     path: 'test-window',
     loadComponent: () => import('./test-window/test-window.component').then(m => m.TestWindowComponent)
   },
+  // Route for Video Cutter
+  {
+    path: 'video-cutter',
+    loadComponent: () => import('./video-cutter/video-cutter.component').then(m => m.VideoCutterComponent)
+  },
   // Catch-all: redirect to home
   { path: '**', redirectTo: '' }
 ];

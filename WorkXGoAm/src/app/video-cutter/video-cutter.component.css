@@ -1,0 +1,24 @@
+/* VideoCutterComponent styles */
+.container {
+  margin: 2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+.form-group {
+  margin-bottom: 1rem;
+}
+button {
+  padding: 0.5rem 1rem;
+  font-size: 1rem;
+  cursor: pointer;
+}
+input[type="number"] {
+  width: 4rem;
+  margin: 0 0.5rem;
+}
+.result-message {
+  margin-top: 1rem;
+  font-weight: bold;
+  color: #333;
+} 
