@@ -21,4 +21,24 @@ input[type="number"] {
   margin-top: 1rem;
   font-weight: bold;
   color: #333;
+}
+
+/* Video preview styling */
+.video-preview-container {
+  transition: all 0.5s ease;
+  max-height: 0;
+  overflow: hidden;
+}
+.video-preview-container.show {
+  max-height: 500px;
+}
+
+/* Progress bar styling */
+.progress-container {
+  height: 0;
+  overflow: hidden;
+  transition: height 0.3s ease;
+}
+.progress-container.show {
+  height: 1.5rem;
 } 

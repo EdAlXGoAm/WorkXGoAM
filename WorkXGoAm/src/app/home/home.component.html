@@ -1,12 +1,34 @@
-<main class="container">
-  <h1 class="title">WorkX</h1>
-
-  <!-- Icon to navigate to TestWindow -->
-  <div class="navigation-icon" routerLink="/test-window">
-    <img src="assets/png_icons/test.png" alt="Ir a Test Window">
+<main class="max-w-5xl mx-auto py-6">
+  <div class="text-center mb-12">
+    <h1 class="text-3xl md:text-4xl font-bold text-gray-800 mb-4">WorkX</h1>
+    <p class="text-gray-600 max-w-2xl mx-auto">Todas tus aplicaciones en un solo lugar. Gestiona tus aplicaciones de forma fácil y eficiente.</p>
   </div>
-  <!-- Botón para Video Cutter -->
-  <button class="video-cutter-button" routerLink="/video-cutter">Video Cutter</button>
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    <!-- Card Test Window -->
+    <div class="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-lg transition-shadow">
+      <div class="bg-blue-500 p-5 text-white">
+        <h3 class="text-xl font-bold">Test Window</h3>
+      </div>
+      <div class="p-5">
+        <p class="text-gray-600 mb-4">Accede a la ventana de pruebas.</p>
+        <a routerLink="/test-window" class="block w-full text-center bg-blue-500 hover:bg-blue-600 text-white py-2 rounded-lg transition-colors">
+          Abrir
+        </a>
+      </div>
+    </div>
+    <!-- Card Video Cutter -->
+    <div class="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-lg transition-shadow">
+      <div class="bg-green-500 p-5 text-white">
+        <h3 class="text-xl font-bold">Video Cutter</h3>
+      </div>
+      <div class="p-5">
+        <p class="text-gray-600 mb-4">Corta y edita tus videos fácilmente.</p>
+        <a routerLink="/video-cutter" class="block w-full text-center bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg transition-colors">
+          Abrir
+        </a>
+      </div>
+    </div>
+  </div>
 
   <footer class="server-info">
     <h3>Flask Server Information</h3>

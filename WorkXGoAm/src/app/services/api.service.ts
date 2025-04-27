@@ -66,7 +66,7 @@ export class ApiService {
   /**
    * Corte de video
    */
-  cutVideo(input: string, start: number, end: number, output: string): Observable<any> {
+  cutVideo(input: string, start: string, end: string, output: string): Observable<any> {
     return this.getApiUrl().pipe(
       switchMap(baseUrl =>
         this.http.post<{ status: string; output?: string; message?: string }>(
