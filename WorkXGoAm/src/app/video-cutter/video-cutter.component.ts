@@ -2,6 +2,7 @@ import { Component, OnInit, ViewChild, ElementRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../services/api.service';
+import { Router } from '@angular/router';
 import { open, save } from '@tauri-apps/plugin-dialog';
 import { downloadDir, basename, extname, join } from '@tauri-apps/api/path';
 
@@ -27,7 +28,7 @@ export class VideoCutterComponent implements OnInit {
   progress: number = 0;
   statusColor: string = 'text-gray-600';
 
-  constructor(private apiService: ApiService) {}
+  constructor(private apiService: ApiService, private router: Router) {}
 
   ngOnInit(): void {}
 
@@ -146,5 +147,9 @@ export class VideoCutterComponent implements OnInit {
     const segments = path.split(/[\\\/]/);
     this.videoInfo = segments.pop() || path;
     this.showStatus('Ruta de video de entrada actualizada', 'text-green-600');
+  }
+
+  public goHome(): void {
+    this.router.navigate(['/']);
   }
 } 

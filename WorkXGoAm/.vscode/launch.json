@@ -1,0 +1,12 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug WorkXFlaskServer",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/flask_server/WorkXFlaskServer.py",
+      "console": "integratedTerminal"
+    }
+  ]
+}
