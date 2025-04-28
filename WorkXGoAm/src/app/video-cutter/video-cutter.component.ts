@@ -46,9 +46,10 @@ export class VideoCutterComponent implements OnInit {
       const filePath = Array.isArray(selected) ? selected[0] : selected;
       this.handleVideoPathChange(filePath);
       const name = await basename(filePath);
-      const ext = await extname(filePath);
-      const nameWithoutExt = name.replace(new RegExp(ext + '$'), '');
-      const suggested = nameWithoutExt + '_clip1' + ext;
+      const dotIndex = name.lastIndexOf('.');
+      const nameWithoutExt = dotIndex !== -1 ? name.slice(0, dotIndex) : name;
+      const ext = dotIndex !== -1 ? name.slice(dotIndex + 1) : '';
+      const suggested = ext ? `${nameWithoutExt}_clip1.${ext}` : `${nameWithoutExt}_clip1`;
       this.outputPath = await join(defaultDir, suggested);
     } catch (e) {
       console.error('Error seleccionando vídeo de entrada:', e);
