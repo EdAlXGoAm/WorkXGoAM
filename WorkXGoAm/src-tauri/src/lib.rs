@@ -15,6 +15,11 @@ use wasapi::*;
 use log::{info, error, warn, debug};
 use std::panic::catch_unwind;
 
+mod wav_monitors;
+use wav_monitors::{start_wav_monitor, start_wav_monitor_gui, WavMonitorProcess, WavMonitorGuiProcess};
+mod workx_flask_server;
+use workx_flask_server::{start_workx_flask_server, WorkXFlaskServerProcess};
+
 #[derive(Serialize)]
 struct AudioDevice {
     name: String,
@@ -23,16 +28,6 @@ struct AudioDevice {
 
 // Structure to store the Python server process
 struct PythonProcess {
-    child: Mutex<Option<Child>>,
-}
-
-// Estructuras para almacenar los procesos de los scripts de Python wav_monitor
-struct WavMonitorProcess {
-    child: Mutex<Option<Child>>,
-}
-
-// Estructuras para almacenar los procesos de los scripts de Python wav_monitor_gui
-struct WavMonitorGuiProcess {
     child: Mutex<Option<Child>>,
 }
 
@@ -97,22 +92,6 @@ impl Drop for TempFlagHandler {
     }
 }
 
-// Structure to store the WorkXFlaskServer process
-struct WorkXFlaskServerProcess {
-    child: Mutex<Option<Child>>,
-}
-
-// Drop implementation to ensure process termination
-impl Drop for WorkXFlaskServerProcess {
-    fn drop(&mut self) {
-        if let Some(mut child) = self.child.lock().unwrap().take() {
-            println!("Terminating WorkXFlaskServer...");
-            let _ = child.kill(); // Attempt to kill the process
-            let _ = child.wait(); // Wait for process to close
-        }
-    }
-}
-
 // Returns the path to the application data directory
 fn get_app_data_dir() -> Result<PathBuf, String> {
     let local_app_data = std::env::var("LOCALAPPDATA").map_err(|e| e.to_string())?;
@@ -131,40 +110,6 @@ fn read_file(path: &str) -> Result<String, String> {
 #[tauri::command]
 fn get_env(variable: &str) -> Result<String, String> {
     std::env::var(variable).map_err(|e| e.to_string())
-}
-
-/// Starts the WorkXFlaskServer and returns the Child for later management
-fn start_workx_flask_server() -> Result<Child, String> {
-    // Get Tauri executable path
-    let exe_path = std::env::current_exe().map_err(|e| e.to_string())?;
-    let exe_dir = exe_path
-        .parent()
-        .ok_or("Failed to get executable directory")?;
-
-    // Look for Python file in flask_server folder
-    let python_script = exe_dir.join("WorkXFlaskServer.exe");
-
-    if !python_script.exists() {
-        return Err(format!(
-            "Python executable not found at: {:?}",
-            python_script
-        ));
-    }
-
-    let mut cmd = Command::new(python_script);
-    
-    // In Windows we can add the CREATE_NO_WINDOW flag to hide the terminal.
-    #[cfg(target_os = "windows")]
-    {
-        use std::os::windows::process::CommandExt;
-        const CREATE_NO_WINDOW: u32 = 0x08000000;
-        cmd.creation_flags(CREATE_NO_WINDOW);
-    }
-
-    // Launch executable in separate background process
-    let child = cmd.spawn().map_err(|e| e.to_string())?;
-
-    Ok(child)
 }
 
 // Function that encapsulates all cleanup tasks before closing the application
@@ -620,110 +565,6 @@ fn get_transcription_files() -> Result<Vec<String>, String> {
         .collect();
     
     Ok(paths)
-}
-
-// Función para iniciar el script wav_monitor.py en una terminal visible
-fn start_wav_monitor() -> Result<Child, String> {
-    // Usar la ruta absoluta donde se encuentran los scripts
-    let script_path = Path::new("D:\\git-edalx\\WorkXGoAm\\WorkXGoAm\\src-tauri\\wav_monitor.py");
-    
-    info!("Intentando ejecutar el script de Python: {:?}", script_path);
-    
-    #[cfg(target_os = "windows")]
-    {
-        // En Windows, usamos cmd para abrir una nueva terminal con el script
-        let mut cmd = Command::new("cmd");
-        cmd.args(&["/c", "start", "cmd", "/k", "python"]);
-        cmd.arg(script_path);
-        
-        // Ejecutar el comando
-        let child = cmd.spawn().map_err(|e| format!("Error al iniciar wav_monitor.py: {}", e))?;
-        info!("Script wav_monitor.py iniciado correctamente");
-        Ok(child)
-    }
-    
-    #[cfg(target_os = "linux")]
-    {
-        // En Linux, podemos usar xterm o gnome-terminal
-        let mut cmd = Command::new("gnome-terminal");
-        cmd.args(&["--", "python"]);
-        cmd.arg(script_path);
-        
-        // Ejecutar el comando
-        let child = cmd.spawn().map_err(|e| format!("Error al iniciar wav_monitor.py: {}", e))?;
-        info!("Script wav_monitor.py iniciado correctamente");
-        Ok(child)
-    }
-    
-    #[cfg(target_os = "macos")]
-    {
-        // En macOS, podemos usar Terminal.app
-        let mut cmd = Command::new("open");
-        cmd.args(&["-a", "Terminal"]);
-        cmd.arg(script_path);
-        
-        // Ejecutar el comando
-        let child = cmd.spawn().map_err(|e| format!("Error al iniciar wav_monitor.py: {}", e))?;
-        info!("Script wav_monitor.py iniciado correctamente");
-        Ok(child)
-    }
-    
-    #[cfg(not(any(target_os = "windows", target_os = "linux", target_os = "macos")))]
-    {
-        Err("Sistema operativo no soportado para iniciar el script wav_monitor.py".to_string())
-    }
-}
-
-// Función para iniciar el script wav_monitor_gui.py en una terminal visible
-fn start_wav_monitor_gui() -> Result<Child, String> {
-    // Usar la ruta absoluta donde se encuentran los scripts
-    let script_path = Path::new("D:\\git-edalx\\WorkXGoAm\\WorkXGoAm\\src-tauri\\wav_monitor_gui.py");
-    
-    info!("Intentando ejecutar el script de Python: {:?}", script_path);
-    
-    #[cfg(target_os = "windows")]
-    {
-        // En Windows, usamos cmd para abrir una nueva terminal con el script
-        let mut cmd = Command::new("cmd");
-        cmd.args(&["/c", "start", "cmd", "/k", "python"]);
-        cmd.arg(script_path);
-        
-        // Ejecutar el comando
-        let child = cmd.spawn().map_err(|e| format!("Error al iniciar wav_monitor_gui.py: {}", e))?;
-        info!("Script wav_monitor_gui.py iniciado correctamente");
-        Ok(child)
-    }
-    
-    #[cfg(target_os = "linux")]
-    {
-        // En Linux, podemos usar xterm o gnome-terminal
-        let mut cmd = Command::new("gnome-terminal");
-        cmd.args(&["--", "python"]);
-        cmd.arg(script_path);
-        
-        // Ejecutar el comando
-        let child = cmd.spawn().map_err(|e| format!("Error al iniciar wav_monitor_gui.py: {}", e))?;
-        info!("Script wav_monitor_gui.py iniciado correctamente");
-        Ok(child)
-    }
-    
-    #[cfg(target_os = "macos")]
-    {
-        // En macOS, podemos usar Terminal.app
-        let mut cmd = Command::new("open");
-        cmd.args(&["-a", "Terminal"]);
-        cmd.arg(script_path);
-        
-        // Ejecutar el comando
-        let child = cmd.spawn().map_err(|e| format!("Error al iniciar wav_monitor_gui.py: {}", e))?;
-        info!("Script wav_monitor_gui.py iniciado correctamente");
-        Ok(child)
-    }
-    
-    #[cfg(not(any(target_os = "windows", target_os = "linux", target_os = "macos")))]
-    {
-        Err("Sistema operativo no soportado para iniciar el script wav_monitor_gui.py".to_string())
-    }
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
