@@ -94,20 +94,6 @@ export class VideoCutterComponent implements OnInit {
       });
   }
 
-  handleVideoSelect(event: Event): void {
-    const input = event.target as HTMLInputElement;
-    const file = input.files?.[0];
-    if (!file) return;
-    this.inputPath = file.name;
-    this.videoPreviewShow = true;
-    const url = URL.createObjectURL(file);
-    this.videoPlayer.nativeElement.src = url;
-    this.videoInfo = `${file.name} • ${(file.size / (1024 * 1024)).toFixed(2)} MB`;
-    this.startTime = '00:00:00';
-    this.endTime = '00:00:00';
-    this.showStatus('Video cargado correctamente', 'text-green-600');
-  }
-
   clearVideo(): void {
     this.inputPath = '';
     this.videoPreviewShow = false;
