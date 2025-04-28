@@ -19,552 +19,67 @@ mod wav_monitors;
 use wav_monitors::{start_wav_monitor, start_wav_monitor_gui, WavMonitorProcess, WavMonitorGuiProcess};
 mod workx_flask_server;
 use workx_flask_server::{start_workx_flask_server, WorkXFlaskServerProcess};
-
-#[derive(Serialize)]
-struct AudioDevice {
-    name: String,
-    id: String,
-}
+mod wav_recording;
+use wav_recording::{record_10_secs, start_continuous_recording, stop_continuous_recording};
+mod files_lib;
+use files_lib::{read_file, get_env, get_app_data_dir};
+mod audio_lib;
+mod transcription_files_lib;
+mod Running_flags;
 
 // Structure to store the Python server process
 struct PythonProcess {
     child: Mutex<Option<Child>>,
 }
 
-// Returns the path of the temporary file in AppData/Local/WorkXGoAm
-fn get_temp_flag_path() -> Result<PathBuf, String> {
-    let local_app_data = std::env::var("LOCALAPPDATA").map_err(|e| e.to_string())?;
-    let app_data_dir = Path::new(&local_app_data).join("WorkXGoAm");
-    println!("AppData directory: {:?}", app_data_dir);
-    // Ensure directory exists
-    std::fs::create_dir_all(&app_data_dir).map_err(|e| e.to_string())?;
-    Ok(app_data_dir.join("running_flag.tmp"))
-}
-struct TempFlagHandler;
-
-impl TempFlagHandler {
-    fn new() -> Result<Self, String> {
-        let temp_file_path = get_temp_flag_path()?;
-        File::create(&temp_file_path).map_err(|e| e.to_string())?;
-        println!("Temporary file created at {:?}", temp_file_path);
-        Ok(TempFlagHandler)
-    }
-}
-
-impl Drop for TempFlagHandler {
-    fn drop(&mut self) {
-        // Remove temporary running_flag.tmp file
-        if let Ok(temp_file_path) = get_temp_flag_path() {
-            let _ = remove_file(&temp_file_path);
-            println!("Temporary file running_flag.tmp removed");
-        }
-
-        // Find and terminate WorkXFlaskServer.exe if it exists
-        #[cfg(target_os = "windows")]
-        {
-            match Command::new("taskkill")
-                .args(&["/F", "/IM", "WorkXFlaskServer.exe"])
-                .status()
-            {
-                Ok(status) if status.success() => {
-                    println!("WorkXFlaskServer.exe terminated successfully.")
-                }
-                Ok(status) => println!(
-                    "Taskkill returned status {} while trying to terminate WorkXFlaskServer.exe",
-                    status
-                ),
-                Err(e) => println!("Error running taskkill: {}", e),
-            }
-        }
-        #[cfg(any(target_os = "linux", target_os = "macos"))]
-        {
-            match Command::new("pkill").arg("WorkXFlaskServer.exe").status() {
-                Ok(status) if status.success() => {
-                    println!("WorkXFlaskServer.exe terminated successfully (using pkill).")
-                }
-                Ok(status) => println!(
-                    "Pkill returned status {} while trying to terminate WorkXFlaskServer.exe",
-                    status
-                ),
-                Err(e) => println!("Error running pkill: {}", e),
-            }
-        }
-    }
-}
-
-// Returns the path to the application data directory
-fn get_app_data_dir() -> Result<PathBuf, String> {
-    let local_app_data = std::env::var("LOCALAPPDATA").map_err(|e| e.to_string())?;
-    let app_data_dir = Path::new(&local_app_data).join("WorkXGoAm");
-    println!("AppData directory: {:?}", app_data_dir);
-    // Ensure directory exists
-    std::fs::create_dir_all(&app_data_dir).map_err(|e| e.to_string())?;
-    Ok(app_data_dir)
-}
-
-#[tauri::command]
-fn read_file(path: &str) -> Result<String, String> {
-    std::fs::read_to_string(path).map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-fn get_env(variable: &str) -> Result<String, String> {
-    std::env::var(variable).map_err(|e| e.to_string())
-}
-
 // Function that encapsulates all cleanup tasks before closing the application
 fn cleanup_before_closing() {
-    // 1. Remove temporary running_flag.tmp file
-    if let Ok(temp_file_path) = get_temp_flag_path() {
-        let _ = remove_file(&temp_file_path);
+    // 1. Eliminar archivo temporal running_flag.tmp
+    if let Ok(temp_file_path) = Running_flags::get_temp_flag_path() {
+        let _ = std::fs::remove_file(&temp_file_path);
         println!("Temporary file running_flag.tmp removed");
     }
 
-    // 2. Find and terminate WorkXFlaskServer.exe if it exists
+    // 2. Terminar WorkXFlaskServer.exe, wav_monitor.py y wav_monitor_gui.py si existen
     #[cfg(target_os = "windows")]
     {
-        match Command::new("taskkill")
-            .args(&["/F", "/IM", "WorkXFlaskServer.exe"])
-            .status()
-        {
-            Ok(status) if status.success() => println!("WorkXFlaskServer.exe terminated successfully."),
-            Ok(status) => println!(
-                "Taskkill returned status {} while trying to terminate WorkXFlaskServer.exe",
-                status
-            ),
-            Err(e) => println!("Error running taskkill: {}", e),
+        for proc_name in ["WorkXFlaskServer.exe", "wav_monitor.exe", "wav_monitor_gui.exe"] {
+            let args = if proc_name == "python.exe" {
+                // Cierra todos los procesos python.exe que estén ejecutando wav_monitor.py o wav_monitor_gui.py
+                // Esto es una solución general, pero si quieres más precisión, puedes usar herramientas como tasklist + findstr
+                // o usar un script externo para filtrar por línea de comando.
+                vec!["/F", "/IM", proc_name]
+            } else {
+                vec!["/F", "/IM", proc_name]
+            };
+            match std::process::Command::new("taskkill")
+                .args(&args)
+                .status()
+            {
+                Ok(status) if status.success() => println!("{} terminated successfully.", proc_name),
+                Ok(status) => println!(
+                    "Taskkill returned status {} while trying to terminate {}",
+                    status, proc_name
+                ),
+                Err(e) => println!("Error running taskkill for {}: {}", proc_name, e),
+            }
         }
     }
     #[cfg(any(target_os = "linux", target_os = "macos"))]
     {
-        match Command::new("pkill").arg("WorkXFlaskServer.exe").status() {
-            Ok(status) if status.success() => {
-                println!("WorkXFlaskServer.exe terminated successfully (using pkill).")
-            }
-            Ok(status) => println!(
-                "Pkill returned status {} while trying to terminate WorkXFlaskServer.exe",
-                status
-            ),
-            Err(e) => println!("Error running pkill: {}", e),
-        }
-    }
-}
-
-#[tauri::command]
-fn get_audio_devices() -> Result<Vec<AudioDevice>, String> {
-    let outputs = DeviceCollection::new(&Direction::Render)
-        .map_err(|e| e.to_string())?;
-    
-    let mut devices = Vec::new();
-    let count = outputs.get_nbr_devices().map_err(|e| e.to_string())?;
-    
-    for i in 0..count {
-        let device = outputs.get_device_at_index(i).map_err(|e| e.to_string())?;
-        let name = device.get_friendlyname().map_err(|e| e.to_string())?;
-        let id = device.get_id().map_err(|e| e.to_string())?;
-        
-        devices.push(AudioDevice {
-            name,
-            id,
-        });
-    }
-    
-    Ok(devices)
-}
-
-/// Escribe un encabezado WAV para audio IEEE float (formato 3) de 32 bits.
-fn write_wav_header(
-    file: &mut File,
-    data_len: u32,
-    channels: u16,
-    sample_rate: u32,
-    bits_per_sample: u16,
-) -> std::io::Result<()> {
-    let byte_rate = sample_rate * channels as u32 * bits_per_sample as u32 / 8;
-    let block_align = channels * bits_per_sample / 8;
-    let subchunk2_size = data_len;
-    let chunk_size = 36 + subchunk2_size;
-
-    let mut header = Vec::with_capacity(44);
-    header.extend_from_slice(b"RIFF");
-    header.extend_from_slice(&chunk_size.to_le_bytes());
-    header.extend_from_slice(b"WAVE");
-    header.extend_from_slice(b"fmt ");
-    header.extend_from_slice(&16u32.to_le_bytes()); // Tamaño de subchunk (16 para PCM/float)
-    header.extend_from_slice(&3u16.to_le_bytes());   // Formato: 3 = IEEE float
-    header.extend_from_slice(&channels.to_le_bytes());
-    header.extend_from_slice(&sample_rate.to_le_bytes());
-    header.extend_from_slice(&byte_rate.to_le_bytes());
-    header.extend_from_slice(&block_align.to_le_bytes());
-    header.extend_from_slice(&bits_per_sample.to_le_bytes());
-    header.extend_from_slice(b"data");
-    header.extend_from_slice(&subchunk2_size.to_le_bytes());
-    file.write_all(&header)
-}
-
-/// Función simplificada para obtener un dispositivo comparando el id.
-fn get_device_by_id(deviceid: &str) -> Result<Device, WasapiError> {
-    let collection = DeviceCollection::new(&Direction::Render)?;
-    let count = collection.get_nbr_devices()?;
-    for i in 0..count {
-        let dev = collection.get_device_at_index(i)?;
-        let id = dev.get_id()?;
-        if id == deviceid {
-            return Ok(dev);
-        }
-    }
-    Err(WasapiError::DeviceNotFound(deviceid.to_string()))
-}
-
-struct ContinuousRecordingState {
-    is_recording: bool,
-    stop_signal: Mutex<bool>,
-}
-
-#[tauri::command]
-fn start_continuous_recording(deviceid: String, app_handle: tauri::AppHandle) -> Result<(), String> {
-    info!("Iniciando grabación continua con dispositivo ID: {}", deviceid);
-    
-    // Creamos el estado de grabación continua
-    let recording_state = ContinuousRecordingState {
-        is_recording: true,
-        stop_signal: Mutex::new(false),
-    };
-    
-    // Lo convertimos en un Arc para compartirlo entre hilos
-    let recording_state = std::sync::Arc::new(recording_state);
-    let recording_state_clone = recording_state.clone();
-    
-    // Clonamos el app_handle para usar en el hilo
-    let app_handle_clone = app_handle.clone();
-    
-    // Lanzamos la grabación continua en un hilo separado
-    std::thread::spawn(move || {
-        info!("Hilo de grabación continua iniciado");
-        
-        // Notificar que la grabación continua ha comenzado
-        app_handle_clone.emit("continuous_recording_started", ()).unwrap_or_default();
-        
-        let mut count = 0;
-        
-        // Bucle de grabación continua
-        while !*recording_state_clone.stop_signal.lock().unwrap() {
-            info!("Iniciando grabación #{} en modo continuo", count + 1);
-            
-            // Ejecutamos record_10_secs_internal directamente sin catch_unwind
-            let result = record_10_secs_internal(deviceid.clone(), app_handle_clone.clone());
-            
-            if let Err(e) = &result {
-                error!("Error en grabación continua: {}", e);
-                app_handle_clone.emit("continuous_recording_error", e).unwrap_or_default();
-                break;
-            }
-            
-            count += 1;
-            
-            // Verificamos si debemos detener la grabación
-            if *recording_state_clone.stop_signal.lock().unwrap() {
-                break;
-            }
-            
-            // Emitimos evento con el número de grabaciones completadas
-            app_handle_clone.emit("continuous_recording_progress", count).unwrap_or_default();
-        }
-        
-        info!("Grabación continua detenida después de {} grabaciones", count);
-        app_handle_clone.emit("continuous_recording_stopped", count).unwrap_or_default();
-    });
-    
-    // Guardamos el estado en el estado de la aplicación para poder detenerlo después
-    app_handle.manage(recording_state);
-    
-    Ok(())
-}
-
-#[tauri::command]
-fn stop_continuous_recording(app_handle: tauri::AppHandle) -> Result<(), String> {
-    info!("Deteniendo grabación continua");
-    
-    // Obtenemos el estado de grabación del estado de la aplicación
-    if let Some(state) = app_handle.try_state::<std::sync::Arc<ContinuousRecordingState>>() {
-        // Establecemos la señal de parada
-        *state.stop_signal.lock().unwrap() = true;
-        info!("Señal de parada enviada a la grabación continua");
-        Ok(())
-    } else {
-        let err_msg = "No hay grabación continua en curso".to_string();
-        error!("{}", err_msg);
-        Err(err_msg)
-    }
-}
-
-// Versión interna de record_10_secs para llamarla desde start_continuous_recording
-fn record_10_secs_internal(deviceid: String, app_handle: tauri::AppHandle) -> Result<(), String> {
-    info!("Iniciando record_10_secs_internal con dispositivo ID: {}", deviceid);
-    
-    // En Tauri, asumimos que COM ya está inicializado por el framework
-    info!("Asumiendo que COM ya está inicializado por Tauri");
-    
-    // Obtén el dispositivo elegido por el usuario.
-    info!("Buscando dispositivo con ID: {}", deviceid);
-    let device = match get_device_by_id(&deviceid) {
-        Ok(d) => {
-            info!("Dispositivo encontrado correctamente");
-            d
-        },
-        Err(e) => {
-            let err_msg = format!("Error al obtener el dispositivo: {:?}", e);
-            error!("{}", err_msg);
-            app_handle.emit("recording_error", err_msg.clone()).unwrap_or_default();
-            return Err(err_msg);
-        }
-    };
-    
-    info!("Obteniendo IAudioClient");
-    let mut audio_client = match device.get_iaudioclient() {
-        Ok(ac) => {
-            info!("IAudioClient obtenido correctamente");
-            ac
-        },
-        Err(e) => {
-            let err_msg = format!("Error al obtener IAudioClient: {:?}", e);
-            error!("{}", err_msg);
-            app_handle.emit("recording_error", err_msg.clone()).unwrap_or_default();
-            return Err(err_msg);
-        }
-    };
-    
-    // Define el formato deseado: 32 bits float, 44100 Hz, 2 canales.
-    info!("Configurando formato de audio");
-    let desired_format = WaveFormat::new(32, 32, &SampleType::Float, 44100, 2, None);
-    
-    info!("Obteniendo períodos de audio");
-    let (def_time, _min_time) = match audio_client.get_periods() {
-        Ok(periods) => {
-            info!("Períodos obtenidos correctamente");
-            periods
-        },
-        Err(e) => {
-            let err_msg = format!("Error al obtener períodos: {:?}", e);
-            error!("{}", err_msg);
-            app_handle.emit("recording_error", err_msg.clone()).unwrap_or_default();
-            return Err(err_msg);
-        }
-    };
-    
-    // Inicializa el cliente en modo compartido para captura (loopback).
-    info!("Inicializando cliente de audio para loopback");
-    match audio_client.initialize_client(
-        &desired_format,
-        def_time,
-        &Direction::Capture,
-        &ShareMode::Shared,
-        true,
-    ) {
-        Ok(_) => info!("Cliente de audio inicializado correctamente"),
-        Err(e) => {
-            let err_msg = format!("Error al inicializar cliente de audio: {:?}", e);
-            error!("{}", err_msg);
-            app_handle.emit("recording_error", err_msg.clone()).unwrap_or_default();
-            return Err(err_msg);
-        }
-    };
-    
-    // Configura el event handle para buffering basado en eventos.
-    info!("Configurando event handle");
-    let h_event = match audio_client.set_get_eventhandle() {
-        Ok(event) => {
-            info!("Event handle configurado correctamente");
-            event
-        },
-        Err(e) => {
-            let err_msg = format!("Error al configurar event handle: {:?}", e);
-            error!("{}", err_msg);
-            app_handle.emit("recording_error", err_msg.clone()).unwrap_or_default();
-            return Err(err_msg);
-        }
-    };
-    
-    // Obtén el cliente de captura y comienza la transmisión.
-    info!("Obteniendo cliente de captura");
-    let capture_client = match audio_client.get_audiocaptureclient() {
-        Ok(client) => {
-            info!("Cliente de captura obtenido correctamente");
-            client
-        },
-        Err(e) => {
-            let err_msg = format!("Error al obtener cliente de captura: {:?}", e);
-            error!("{}", err_msg);
-            app_handle.emit("recording_error", err_msg.clone()).unwrap_or_default();
-            return Err(err_msg);
-        }
-    };
-    
-    info!("Iniciando stream de audio");
-    match audio_client.start_stream() {
-        Ok(_) => info!("Stream de audio iniciado correctamente"),
-        Err(e) => {
-            let err_msg = format!("Error al iniciar stream de audio: {:?}", e);
-            error!("{}", err_msg);
-            app_handle.emit("recording_error", err_msg.clone()).unwrap_or_default();
-            return Err(err_msg);
-        }
-    };
-    
-    // Notificar que la grabación ha comenzado
-    app_handle.emit("recording_started", ()).unwrap_or_default();
-    
-    let start = Instant::now();
-    let mut captured_data = Vec::new();
-    let mut sample_queue: VecDeque<u8> = VecDeque::new();
-    
-    info!("Iniciando captura de audio por 10 segundos");
-    // Graba durante 10 segundos esperando la señal del event handle.
-    while start.elapsed() < Duration::from_secs(10) {
-        if h_event.wait_for_event(100_000).is_ok() {
-            match capture_client.read_from_device_to_deque(&mut sample_queue) {
-                Ok(_) => {
-                    debug!("Leídos {} bytes de audio", sample_queue.len());
-                    while let Some(byte) = sample_queue.pop_front() {
-                        captured_data.push(byte);
-                    }
-                    
-                    // Enviar progreso a la interfaz
-                    let progress = start.elapsed().as_secs_f32() / 10.0 * 100.0;
-                    app_handle.emit("recording_progress", progress).unwrap_or_default();
-                },
-                Err(e) => {
-                    let err_msg = format!("Error al leer datos de audio: {:?}", e);
-                    error!("{}", err_msg);
-                    // Intentamos detener el stream antes de retornar el error
-                    let _ = audio_client.stop_stream();
-                    app_handle.emit("recording_error", err_msg.clone()).unwrap_or_default();
-                    return Err(err_msg);
+        for proc_name in ["WorkXFlaskServer.exe", "wav_monitor.exe", "wav_monitor_gui.exe"] {
+            match std::process::Command::new("pkill").arg(proc_name).status() {
+                Ok(status) if status.success() => {
+                    println!("{} terminated successfully (using pkill).", proc_name)
                 }
+                Ok(status) => println!(
+                    "Pkill returned status {} while trying to terminate {}",
+                    status, proc_name
+                ),
+                Err(e) => println!("Error running pkill for {}: {}", proc_name, e),
             }
         }
     }
-    
-    info!("Deteniendo stream de audio");
-    match audio_client.stop_stream() {
-        Ok(_) => info!("Stream de audio detenido correctamente"),
-        Err(e) => {
-            let err_msg = format!("Error al detener stream de audio: {:?}", e);
-            error!("{}", err_msg);
-            app_handle.emit("recording_error", err_msg.clone()).unwrap_or_default();
-            return Err(err_msg);
-        }
-    };
-    
-    // Crea un nombre de archivo con timestamp.
-    let filename = format!("record_{}.wav", Local::now().format("%Y%m%d_%H%M%S"));
-    info!("Guardando archivo de audio: {}", filename);
-    
-    let mut file = match File::create(&filename) {
-        Ok(f) => {
-            info!("Archivo creado correctamente");
-            f
-        },
-        Err(e) => {
-            let err_msg = format!("Error al crear archivo: {}", e);
-            error!("{}", err_msg);
-            app_handle.emit("recording_error", err_msg.clone()).unwrap_or_default();
-            return Err(err_msg);
-        }
-    };
-    
-    let data_len = captured_data.len() as u32;
-    info!("Grabados {} bytes de audio", data_len);
-    
-    match write_wav_header(&mut file, data_len, 2, 44100, 32) {
-        Ok(_) => info!("Encabezado WAV escrito correctamente"),
-        Err(e) => {
-            let err_msg = format!("Error al escribir encabezado WAV: {}", e);
-            error!("{}", err_msg);
-            app_handle.emit("recording_error", err_msg.clone()).unwrap_or_default();
-            return Err(err_msg);
-        }
-    };
-    
-    match file.write_all(&captured_data) {
-        Ok(_) => info!("Datos de audio escritos correctamente"),
-        Err(e) => {
-            let err_msg = format!("Error al escribir datos de audio: {}", e);
-            error!("{}", err_msg);
-            app_handle.emit("recording_error", err_msg.clone()).unwrap_or_default();
-            return Err(err_msg);
-        }
-    };
-    
-    info!("Grabación completada exitosamente: {}", filename);
-    // Notificar que la grabación ha terminado con éxito
-    app_handle.emit("recording_finished", filename).unwrap_or_default();
-    
-    Ok(())
-}
-
-#[tauri::command]
-fn record_10_secs(deviceid: String, app_handle: tauri::AppHandle) -> Result<(), String> {
-    info!("Iniciando record_10_secs con dispositivo ID: {}", deviceid);
-    
-    // Clonamos el app_handle para poder usarlo en el hilo
-    let app_handle_clone = app_handle.clone();
-    
-    // Lanzamos la grabación en un hilo separado
-    std::thread::spawn(move || {
-        info!("Hilo de grabación iniciado");
-        
-        let result = record_10_secs_internal(deviceid, app_handle_clone);
-        if let Err(e) = result {
-            error!("Error en record_10_secs: {}", e);
-        }
-    });
-    
-    // Retornamos inmediatamente para no bloquear la interfaz
-    Ok(())
-}
-
-#[tauri::command]
-fn read_transcription_file(path: &str) -> Result<String, String> {
-    std::fs::read_to_string(path).map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-fn get_transcription_files() -> Result<Vec<String>, String> {
-    // Obtiene el directorio actual donde se ejecuta la aplicación
-    let current_dir = std::env::current_dir().map_err(|e| e.to_string())?;
-    
-    // Lee todos los archivos en el directorio actual
-    let entries = read_dir(current_dir).map_err(|e| e.to_string())?;
-    
-    // Filtra solo los archivos .txt y ordénalos por fecha de modificación (más reciente primero)
-    let mut txt_files: Vec<(PathBuf, std::time::SystemTime)> = Vec::new();
-    
-    for entry in entries {
-        let entry = entry.map_err(|e| e.to_string())?;
-        let path = entry.path();
-        
-        // Verifica si es un archivo .txt
-        if path.is_file() && path.extension().map_or(false, |ext| ext == "txt") {
-            // Obtiene la fecha de modificación
-            if let Ok(metadata) = entry.metadata() {
-                if let Ok(modified) = metadata.modified() {
-                    txt_files.push((path, modified));
-                }
-            }
-        }
-    }
-    
-    // Ordena por fecha de modificación (más reciente primero)
-    txt_files.sort_by(|a, b| b.1.cmp(&a.1));
-    
-    // Convierte las rutas a cadenas
-    let paths: Vec<String> = txt_files
-        .into_iter()
-        .map(|(path, _)| path.to_string_lossy().to_string())
-        .collect();
-    
-    Ok(paths)
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -627,7 +142,7 @@ pub fn run() {
             
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![read_file, get_env, get_audio_devices, record_10_secs, start_continuous_recording, stop_continuous_recording, read_transcription_file, get_transcription_files])
+        .invoke_handler(tauri::generate_handler![read_file, get_env, audio_lib::get_audio_devices, record_10_secs, start_continuous_recording, stop_continuous_recording, transcription_files_lib::read_transcription_file, transcription_files_lib::get_transcription_files])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

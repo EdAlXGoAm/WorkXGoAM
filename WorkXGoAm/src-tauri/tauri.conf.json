@@ -29,7 +29,9 @@
       "icons/icon.ico"
     ],
     "resources": [
-      "WorkXFlaskServer.exe"
+      "WorkXFlaskServer.exe",
+      "wav_monitor.exe",
+      "wav_monitor_gui.exe"
     ]
   }
 }

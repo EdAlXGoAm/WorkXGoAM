@@ -11,11 +11,11 @@ from tkinter import ttk, scrolledtext, filedialog, messagebox
 from typing import List, Set, Dict, Optional
 from datetime import datetime
 import openai
-from dotenv import load_dotenv
-from pydub import AudioSegment
+import sys
 
-# Cargar variables de entorno para la API key
-load_dotenv()
+# ====== PON AQUÍ TU API KEY DE OPENAI ======
+API_KEY = "AQUÍ_TU_API_KEY"
+# ===========================================
 
 # Configurar logging
 logging.basicConfig(
@@ -50,10 +50,10 @@ class AudioTranscriber:
         Args:
             api_key: API key de OpenAI. Si no se proporciona, se intentará cargar de las variables de entorno.
         """
-        # Usar la API key proporcionada o intentar cargarla de las variables de entorno
-        self.api_key = api_key or os.getenv('OPENAI_API_KEY')
+        # Usar la API key hardcodeada
+        self.api_key = API_KEY
         if not self.api_key:
-            raise ValueError("No se proporcionó API key y no se encontró en las variables de entorno")
+            raise ValueError("No se proporcionó API key. Por favor, edítala en la variable API_KEY al inicio del archivo.")
         
         # Inicializar cliente de OpenAI
         self.client = openai.OpenAI(api_key=self.api_key)
@@ -140,7 +140,7 @@ class ContextGenerator:
         self.directory = directory
         self.context_file = os.path.join(directory, CONTEXT_FILE)
         self.summary_state_file = os.path.join(directory, SUMMARY_STATE_FILE)
-        self.api_key = os.getenv('OPENAI_API_KEY')
+        self.api_key = API_KEY
         self.status_callback = status_callback
         
         if self.api_key:

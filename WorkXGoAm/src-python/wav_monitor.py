@@ -11,10 +11,7 @@ from datetime import datetime
 import heapq
 from collections import Counter
 import openai
-from dotenv import load_dotenv
-
-# Cargar variables de entorno para la API key
-load_dotenv()
+import sys
 
 # Configurar logging
 logging.basicConfig(
@@ -36,6 +33,10 @@ SUMMARY_STATE_FILE = ".summary_state.json"  # Archivo para mantener estado del r
 LANGUAGE = "en"
 PROMPT = "Transcribe lo que escuchas, no omitas ninguna palabra"
 
+# ====== PON AQUÍ TU API KEY DE OPENAI ======
+API_KEY = "AQUÍ_TU_API_KEY"
+# ===========================================
+
 class ContextGenerator:
     """
     Genera y actualiza un archivo de contexto basado en las transcripciones más recientes.
@@ -53,7 +54,7 @@ class ContextGenerator:
         self.summary_state_file = os.path.join(directory, SUMMARY_STATE_FILE)
         self.running = False
         self.thread = None
-        self.api_key = os.getenv('OPENAI_API_KEY')
+        self.api_key = API_KEY
         if self.api_key:
             self.client = openai.OpenAI(api_key=self.api_key)
         logger.info(f"Generador de contexto inicializado para: {directory}")
@@ -711,4 +712,4 @@ def main():
     return 0
 
 if __name__ == "__main__":
-    exit(main()) 
+    sys.exit(main()) 
