@@ -308,6 +308,29 @@ export class TestWindowComponent implements OnInit, OnDestroy {
     }
   }
 
+  // Métodos para iniciar los wav monitors bajo demanda
+  async startWavMonitor(): Promise<void> {
+    try {
+      this.statusMessage = 'Iniciando Wav Monitor...';
+      const response = await invoke<string>('start_wav_monitor_cmd');
+      this.statusMessage = response;
+    } catch (error) {
+      console.error('Error iniciando wav monitor:', error);
+      this.statusMessage = `Error iniciando wav monitor: ${error}`;
+    }
+  }
+
+  async startWavMonitorGui(): Promise<void> {
+    try {
+      this.statusMessage = 'Iniciando Wav Monitor GUI...';
+      const response = await invoke<string>('start_wav_monitor_gui_cmd');
+      this.statusMessage = response;
+    } catch (error) {
+      console.error('Error iniciando wav monitor GUI:', error);
+      this.statusMessage = `Error iniciando wav monitor GUI: ${error}`;
+    }
+  }
+
   goBack(): void {
     this.router.navigate(['/']);
   }

@@ -128,4 +128,16 @@ pub fn start_wav_monitor_gui() -> Result<Child, String> {
         log::info!("wav_monitor_gui.exe iniciado correctamente");
         Ok(child)
     }
+}
+
+/// Comando Tauri para iniciar wav_monitor bajo demanda
+#[tauri::command]
+pub fn start_wav_monitor_cmd() -> Result<String, String> {
+    start_wav_monitor().map(|_| "wav_monitor iniciado".into()).map_err(|e| e)
+}
+
+/// Comando Tauri para iniciar wav_monitor_gui bajo demanda
+#[tauri::command]
+pub fn start_wav_monitor_gui_cmd() -> Result<String, String> {
+    start_wav_monitor_gui().map(|_| "wav_monitor_gui iniciado".into()).map_err(|e| e)
 } 

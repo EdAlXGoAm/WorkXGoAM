@@ -3,8 +3,9 @@ use std::sync::Mutex;
 use tauri::Manager;
 
 mod wav_monitors;
-use wav_monitors::{start_wav_monitor, start_wav_monitor_gui, WavMonitorProcess, WavMonitorGuiProcess};
+use wav_monitors::{WavMonitorProcess, WavMonitorGuiProcess, start_wav_monitor_cmd, start_wav_monitor_gui_cmd};
 mod workx_flask_server;
+use workx_flask_server::{start_workx_flask_server, WorkXFlaskServerProcess};
 mod wav_recording;
 use wav_recording::{record_10_secs, start_continuous_recording, stop_continuous_recording};
 mod files_lib;
@@ -82,6 +83,10 @@ pub fn run() {
                 }
             }
 
+            // Registrar estado para los monitores pero sin iniciarlos
+            app.manage(WavMonitorProcess { child: Mutex::new(None) });
+            app.manage(WavMonitorGuiProcess { child: Mutex::new(None) });
+
             // Get main window
             let main_window = app
                 .get_webview_window("main")
@@ -109,31 +114,12 @@ pub fn run() {
                 }
             }
             
-            // Iniciar wav_monitor.py en una terminal visible
-            match start_wav_monitor() {
-                Ok(child) => {
-                    println!("wav_monitor.py started successfully.");
-                    app.manage(WavMonitorProcess {
-                        child: Mutex::new(Some(child)),
-                    });
-                }
-                Err(e) => eprintln!("Error starting wav_monitor.py: {:?}", e),
-            }
-            
-            // Iniciar wav_monitor_gui.py en una terminal visible
-            match start_wav_monitor_gui() {
-                Ok(child) => {
-                    println!("wav_monitor_gui.py started successfully.");
-                    app.manage(WavMonitorGuiProcess {
-                        child: Mutex::new(Some(child)),
-                    });
-                }
-                Err(e) => eprintln!("Error starting wav_monitor_gui.py: {:?}", e),
-            }
-            
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![read_file, get_env, audio_lib::get_audio_devices, record_10_secs, start_continuous_recording, stop_continuous_recording, transcription_files_lib::read_transcription_file, transcription_files_lib::get_transcription_files])
+        .invoke_handler(tauri::generate_handler![
+            read_file, get_env, audio_lib::get_audio_devices, record_10_secs, start_continuous_recording, stop_continuous_recording, transcription_files_lib::read_transcription_file, transcription_files_lib::get_transcription_files,
+            start_wav_monitor_cmd, start_wav_monitor_gui_cmd
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
