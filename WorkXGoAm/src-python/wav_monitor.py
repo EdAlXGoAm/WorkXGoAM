@@ -12,6 +12,8 @@ import heapq
 from collections import Counter
 import openai
 import sys
+import argparse
+from FileToText import AudioTranscriber as FTTranscriber
 
 # Configurar logging
 logging.basicConfig(
@@ -21,8 +23,11 @@ logging.basicConfig(
 )
 logger = logging.getLogger('wav_monitor')
 
-# Configuración
-MONITOR_DIR = "D:/git-edalx/WorkXGoAm/WorkXGoAm/src-tauri"  # Cambia esto a la ruta que deseas monitorear
+# Configuración: monitor-dir obligatorio
+parser = argparse.ArgumentParser()
+parser.add_argument("--monitor-dir", dest="monitor_dir", type=str, required=True, help="Directorio a monitorear")
+args = parser.parse_args()
+MONITOR_DIR = args.monitor_dir
 CHECK_INTERVAL = 5  # Segundos entre cada comprobación
 FILETOTTEXT_SCRIPT = "FileToText.py"  # Nombre del script principal
 CONTEXT_INTERVAL = 60  # Segundos entre actualizaciones de contexto
@@ -34,7 +39,7 @@ LANGUAGE = "en"
 PROMPT = "Transcribe lo que escuchas, no omitas ninguna palabra"
 
 # ====== PON AQUÍ TU API KEY DE OPENAI ======
-API_KEY = "AQUÍ_TU_API_KEY"
+API_KEY = ""
 # ===========================================
 
 class ContextGenerator:
@@ -467,6 +472,8 @@ class WavProcessor:
         
         # Inicializar el generador de contexto
         self.context_generator = ContextGenerator(self.directory)
+        # Inicializar transcriptor de FileToText como librería
+        self.ft_transcriber = FTTranscriber(api_key=API_KEY)
         
         # Verificar que el directorio exista
         if not os.path.exists(self.directory):
@@ -572,52 +579,42 @@ class WavProcessor:
             
             logger.info(f"Procesando: {base_name}")
             
-            # Ejecutar FileToText.py con los argumentos específicos
-            cmd = [
-                "python", 
-                FILETOTTEXT_SCRIPT, 
-                "--file", wav_file, 
-                "--language", LANGUAGE,
-                "--prompt", PROMPT,
-                "--convert"
-            ]
-            
-            process = subprocess.Popen(
-                cmd, 
-                stdout=subprocess.PIPE, 
-                stderr=subprocess.PIPE,
-                text=True
+            # Procesar WAV usando FileToText como librería
+            transcriber = self.ft_transcriber
+            audio_file = wav_file
+            mp3_file = None
+            if wav_file.lower().endswith('.wav'):
+                mp3_file = transcriber.convert_wav_to_mp3(wav_file)
+                audio_file = mp3_file
+
+            # Transcribir con todos los modelos
+            results = transcriber.transcribe_with_all_models(
+                audio_file,
+                language=LANGUAGE,
+                prompt=PROMPT
             )
-            
-            # Capturar la salida
-            stdout, stderr = process.communicate()
-            
-            if process.returncode != 0:
-                logger.error(f"Error procesando {base_name}: {stderr}")
-                return
-                
-            # Extraer las transcripciones del resultado
-            output_text = ""
-            silence_detected = False
-            
-            # Verificar si se detectó silencio
-            if "[silence]" in stdout:
-                silence_detected = True
+
+            # Generar transcripción optimizada
+            optimized_text = transcriber.optimize_transcription(results)
+
+            # Preparar texto de salida
+            if optimized_text == transcriber.SILENCE_TAG:
                 logger.info(f"Silencio detectado en archivo: {base_name}")
                 output_text = "[silence]\nArchivo de audio vacío o sin contenido audible."
             else:
-                # Extraer la transcripción optimizada si está disponible
-                if "[transcripción-optimizada]" in stdout:
-                    sections = stdout.split("[transcripción-optimizada]")
-                    if len(sections) > 1:
-                        # Tomar la parte después de la etiqueta
-                        optimized_text = sections[1].strip()
-                        output_text = f"\n{optimized_text}\n"
-            
+                output_text = f"\n{optimized_text}\n"
+
+            # # Eliminar archivo MP3 temporal
+            # if mp3_file and os.path.exists(mp3_file):
+            #     try:
+            #         os.remove(mp3_file)
+            #     except:
+            #         pass
+
             # Guardar en archivo
             with open(output_file, 'w', encoding='utf-8') as f:
                 f.write(output_text)
-                
+
             logger.info(f"Archivo guardado: {os.path.basename(output_file)}")
             
         except Exception as e:

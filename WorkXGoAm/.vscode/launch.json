@@ -5,7 +5,8 @@
       "name": "Debug WorkXFlaskServer",
       "type": "debugpy",
       "request": "launch",
-      "program": "${workspaceFolder}/flask_server/WorkXFlaskServer.py",
+      "program": "${workspaceFolder}/src-python/wav_monitor.py",
+      "args": ["--monitor-dir", "C:\\Users\\uif05375\\AppData\\Local\\WorkXGoAm\\wav_tmp\\wav_files_2025-04-28 23-05-18"],
       "console": "integratedTerminal"
     }
   ]

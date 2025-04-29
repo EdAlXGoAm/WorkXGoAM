@@ -1,6 +1,7 @@
 use std::fs::read_to_string;
 use std::fs::read_dir;
 use std::path::PathBuf;
+use crate::running_flags::read_temp_flag;
 
 #[tauri::command]
 pub fn read_transcription_file(path: &str) -> Result<String, String> {
@@ -9,8 +10,8 @@ pub fn read_transcription_file(path: &str) -> Result<String, String> {
 
 #[tauri::command]
 pub fn get_transcription_files() -> Result<Vec<String>, String> {
-    let current_dir = std::env::current_dir().map_err(|e| e.to_string())?;
-    let entries = read_dir(current_dir).map_err(|e| e.to_string())?;
+    let monitor_dir = read_temp_flag()?;
+    let entries = read_dir(monitor_dir).map_err(|e| e.to_string())?;
     let mut txt_files: Vec<(PathBuf, std::time::SystemTime)> = Vec::new();
     for entry in entries {
         let entry = entry.map_err(|e| e.to_string())?;

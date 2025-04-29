@@ -10,11 +10,14 @@ import tkinter as tk
 from tkinter import ttk, scrolledtext, filedialog, messagebox
 from typing import List, Set, Dict, Optional
 from datetime import datetime
+from pydub import AudioSegment
 import openai
 import sys
+import argparse
+from FileToText import AudioTranscriber as FTTranscriber
 
 # ====== PON AQUÍ TU API KEY DE OPENAI ======
-API_KEY = "AQUÍ_TU_API_KEY"
+API_KEY = ""
 # ===========================================
 
 # Configurar logging
@@ -25,8 +28,11 @@ logging.basicConfig(
 )
 logger = logging.getLogger('wav_monitor_gui')
 
-# Configuración por defecto
-DEFAULT_MONITOR_DIR = "D:/git-edalx/WorkXGoAm/WorkXGoAm/src-tauri"
+# Parsear argumento obligatorio --monitor-dir y obtener ruta
+parser = argparse.ArgumentParser()
+parser.add_argument("--monitor-dir", dest="monitor_dir", type=str, required=True, help="Directorio a monitorear")
+args = parser.parse_args()
+monitor_dir = args.monitor_dir
 CHECK_INTERVAL = 5  # Segundos entre cada comprobación
 FILETOTTEXT_SCRIPT = "FileToText.py"  # Nombre del script principal
 CONTEXT_FILE = "contexto.txt"  # Nombre del archivo de contexto
@@ -559,7 +565,7 @@ class WavMonitorGUI:
         self.root.minsize(800, 600)
         
         # Variables
-        self.monitor_dir = tk.StringVar(value=DEFAULT_MONITOR_DIR)
+        self.monitor_dir = tk.StringVar(value=monitor_dir)
         self.status_var = tk.StringVar(value="Listo para comenzar")
         
         # Componentes para monitoreo
@@ -569,11 +575,9 @@ class WavMonitorGUI:
         self.monitoring = False
         self.processor = None
         self.context_generator = None
-        self.transcriber = None
-        
-        # Intentar inicializar el transcriptor
+        # Inicializar transcriptor de FileToText como librería
         try:
-            self.transcriber = AudioTranscriber()
+            self.transcriber = FTTranscriber(api_key=API_KEY)
         except Exception as e:
             logger.error(f"Error al inicializar transcriptor: {str(e)}")
             self.update_status(f"Error: {str(e)}")
@@ -687,12 +691,10 @@ class WavMonitorGUI:
             self.update_status(f"Error: El directorio {directory} no existe")
             return
         
+        # Asegurar que self.transcriber esté inicializado
         if not self.transcriber:
-            try:
-                self.transcriber = AudioTranscriber()
-            except Exception as e:
-                self.update_status(f"Error al inicializar transcriptor: {str(e)}")
-                return
+            self.update_status("Error: no se pudo inicializar el transcriptor")
+            return
         
         # Inicializar el generador de contexto si no existe
         if not self.context_generator or self.context_generator.directory != directory:
@@ -724,35 +726,34 @@ class WavMonitorGUI:
             
             for wav_file in recent_files:
                 filename = os.path.basename(wav_file)
-                # self.root.after(0, lambda f=filename: self.update_status(f"Transcribiendo {f}..."))
-                
                 # Convertir a MP3 si es necesario
                 audio_file = wav_file
+                local_mp3 = None
                 if wav_file.lower().endswith('.wav'):
                     try:
-                        mp3_file = self.transcriber.convert_wav_to_mp3(wav_file)
-                        audio_file = mp3_file
+                        local_mp3 = self.transcriber.convert_wav_to_mp3(wav_file)
+                        audio_file = local_mp3
                     except Exception as e:
                         self.root.after(0, lambda e=e: self.update_status(f"Error al convertir a MP3: {str(e)}"))
                         continue
-                
-                # Transcribir con Whisper
+
+                # Transcribir con todos los modelos y optimizar
                 try:
-                    transcription = self.transcriber.transcribe_audio(
+                    results = self.transcriber.transcribe_with_all_models(
                         audio_file=audio_file,
-                        language="en"  # Usar inglés como se solicitó
+                        language=LANGUAGE,
+                        prompt=PROMPT
                     )
-                    
-                    self.root.after(0, lambda f=filename, t=transcription: self.text_area.insert(tk.END, f"\n--- {f} ---\n{t}\n\n"))
-                    # self.root.after(0, lambda f=filename: self.update_status(f"Transcripción de {f} completada"))
-                    
+                    optimized = self.transcriber.optimize_transcription(results)
+
+                    self.root.after(0, lambda f=filename, t=optimized: self.text_area.insert(tk.END, f"\n--- {f} ---\n{t}\n\n"))
                 except Exception as e:
                     self.root.after(0, lambda f=filename, e=e: self.update_status(f"Error al transcribir {f}: {str(e)}"))
-                
-                # Limpiar archivos temporales
-                if 'mp3_file' in locals() and os.path.exists(mp3_file):
+
+                # Eliminar archivo MP3 temporal
+                if local_mp3 and os.path.exists(local_mp3):
                     try:
-                        os.remove(mp3_file)
+                        os.remove(local_mp3)
                     except:
                         pass
             

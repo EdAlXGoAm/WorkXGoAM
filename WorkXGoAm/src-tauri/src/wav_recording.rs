@@ -3,11 +3,15 @@ use std::io::Write;
 use std::sync::{Arc, Mutex};
 use std::collections::VecDeque;
 use std::time::{Duration, Instant};
+use std::fs;
 
 use tauri::{AppHandle, Manager, Emitter};
 use log::{info, error};
 use chrono::Local;
 use wasapi::{DeviceCollection, Direction, Device, WasapiError, WaveFormat, SampleType, ShareMode};
+use crate::running_flags::get_temp_flag_path;
+use crate::files_lib::get_app_data_dir;
+use crate::files_lib::read_file;
 
 /// Estado para grabación continua
 struct ContinuousRecordingState {
@@ -30,6 +34,9 @@ pub fn start_continuous_recording(deviceid: String, app_handle: AppHandle) -> Re
             if let Err(e) = record_10_secs_internal(deviceid.clone(), app_clone.clone()) {
                 error!("Error en grabación continua: {}", e);
                 app_clone.emit("continuous_recording_error", e).unwrap_or_default();
+                break;
+            }
+            if *state_clone.stop_signal.lock().unwrap() {
                 break;
             }
             count += 1;
@@ -116,6 +123,12 @@ fn record_10_secs_internal(deviceid: String, app_handle: AppHandle) -> Result<()
     let mut captured_data = Vec::new();
     let mut sample_queue: VecDeque<u8> = VecDeque::new();
     while start.elapsed() < Duration::from_secs(10) {
+        if let Some(state) = app_handle.try_state::<Arc<ContinuousRecordingState>>() {
+            if *state.stop_signal.lock().unwrap() {
+                audio_client.stop_stream().unwrap_or_default();
+                return Ok(());
+            }
+        }
         if h_event.wait_for_event(100_000).is_ok() {
             capture_client.read_from_device_to_deque(&mut sample_queue).map_err(|e| {
                 let msg = format!("Error al leer datos: {:?}", e);
@@ -131,12 +144,16 @@ fn record_10_secs_internal(deviceid: String, app_handle: AppHandle) -> Result<()
         }
     }
     audio_client.stop_stream().unwrap_or_default();
+    // Obtener el directorio de destino desde running_flag.tmp
+    let flag_path = get_temp_flag_path()?;
+    let monitor_dir = read_file(flag_path.to_string_lossy().as_ref())?.trim().to_string();
     let filename = format!("record_{}.wav", Local::now().format("%Y%m%d_%H%M%S"));
-    let mut file = File::create(&filename).map_err(|e| e.to_string())?;
+    let wav_path = std::path::Path::new(&monitor_dir).join(&filename);
+    let mut file = File::create(&wav_path).map_err(|e| e.to_string())?;
     let data_len = captured_data.len() as u32;
     write_wav_header(&mut file, data_len, 2, 44100, 32).map_err(|e| e.to_string())?;
     file.write_all(&captured_data).map_err(|e| e.to_string())?;
-    app_handle.emit("recording_finished", filename.clone()).unwrap_or_default();
+    app_handle.emit("recording_finished", wav_path.to_string_lossy().to_string()).unwrap_or_default();
     Ok(())
 }
 
@@ -180,4 +197,19 @@ fn get_device_by_id(deviceid: &str) -> Result<Device, WasapiError> {
         }
     }
     Err(WasapiError::DeviceNotFound(deviceid.to_string()))
+}
+
+/// Prepara el directorio temporal para archivos WAV
+pub fn prepare_wav_directory() -> Result<String, String> {
+    // Obtener directorio de datos de la aplicación
+    let app_data_dir = get_app_data_dir()?;
+    // Comprobar o crear la carpeta wav_tmp
+    let wav_tmp_dir = app_data_dir.join("wav_tmp");
+    fs::create_dir_all(&wav_tmp_dir).map_err(|e| e.to_string())?;
+    // Generar subdirectorio con timestamp
+    let timestamp = Local::now().format("%Y-%m-%d %H-%M-%S").to_string();
+    let new_dir_name = format!("wav_files_{}", timestamp);
+    let new_dir_path = wav_tmp_dir.join(&new_dir_name);
+    fs::create_dir_all(&new_dir_path).map_err(|e| e.to_string())?;
+    Ok(new_dir_path.to_string_lossy().into_owned())
 } 

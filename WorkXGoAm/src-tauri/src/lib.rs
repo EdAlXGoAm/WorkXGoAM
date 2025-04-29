@@ -7,7 +7,7 @@ use wav_monitors::{WavMonitorProcess, WavMonitorGuiProcess, start_wav_monitor_cm
 mod workx_flask_server;
 use workx_flask_server::{start_workx_flask_server, WorkXFlaskServerProcess};
 mod wav_recording;
-use wav_recording::{record_10_secs, start_continuous_recording, stop_continuous_recording};
+use wav_recording::{record_10_secs, start_continuous_recording, stop_continuous_recording, prepare_wav_directory};
 mod files_lib;
 use files_lib::{read_file, get_env};
 mod audio_lib;
@@ -70,11 +70,25 @@ pub fn run() {
     // Inicializar el sistema de logging
     env_logger::init();
     
+    
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
-        .setup(|app| {            // Crear y almacenar TempFlagHandler para gestionar el archivo temporal
-            match TempFlagHandler::new() {
+        .setup(|app| {
+            // Crear el directorio de trabajo y running_flag.tmp al inicio
+            let mut monitor_dir: Option<String> = None;
+            match prepare_wav_directory() {
+                Ok(dir) => {
+                    monitor_dir = Some(dir.clone());
+                    log::info!("Directorio de trabajo preparado: {}", dir);
+                },
+                Err(e) => {
+                    eprintln!("Error preparando el directorio de trabajo: {}", e);
+                }
+            }
+
+            // Crear y almacenar TempFlagHandler para gestionar el archivo temporal
+            match TempFlagHandler::new(monitor_dir.as_ref().unwrap()) {
                 Ok(handler) => {
                     app.manage(handler);
                 },

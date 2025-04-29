@@ -1,5 +1,8 @@
 use std::process::{Child};
 use std::sync::Mutex;
+use std::path::PathBuf;
+use crate::files_lib::read_file;
+use crate::running_flags::get_temp_flag_path;
 
 /// Estructuras para almacenar los procesos de los scripts de Python wav_monitor
 #[allow(dead_code)]
@@ -15,16 +18,24 @@ pub struct WavMonitorGuiProcess {
 
 /// Función para iniciar el script wav_monitor.py o wav_monitor.exe según el modo
 pub fn start_wav_monitor() -> Result<Child, String> {
+    // Leo el path del directorio desde running_flag.tmp
+    let flag_path = get_temp_flag_path()?;
+    let monitor_dir = read_file(flag_path.to_string_lossy().as_ref())?.trim().to_string();
     #[cfg(debug_assertions)]
     {
         // En modo debug, ejecuta el .py desde la ruta fuente
-        let script_path = std::path::Path::new("D:/git-edalx/WorkXGoAm/WorkXGoAm/src-python/wav_monitor.py");
+        let script_path = {
+            let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+            manifest_dir.parent().expect("Error al obtener el directorio del proyecto").join("src-python").join("wav_monitor.py")
+        };
         log::info!("Intentando ejecutar el script de Python: {:?}", script_path);
         #[cfg(target_os = "windows")]
         {
             let mut cmd = std::process::Command::new("cmd");
             cmd.args(&["/c", "start", "cmd", "/k", "python"]);
             cmd.arg(script_path);
+            cmd.arg("--monitor-dir");
+            cmd.arg(&monitor_dir);
             let child = cmd.spawn().map_err(|e| format!("Error al iniciar wav_monitor.py: {}", e))?;
             log::info!("Script wav_monitor.py iniciado correctamente");
             return Ok(child);
@@ -34,6 +45,8 @@ pub fn start_wav_monitor() -> Result<Child, String> {
             let mut cmd = std::process::Command::new("gnome-terminal");
             cmd.args(&["--", "python"]);
             cmd.arg(script_path);
+            cmd.arg("--monitor-dir");
+            cmd.arg(&monitor_dir);
             let child = cmd.spawn().map_err(|e| format!("Error al iniciar wav_monitor.py: {}", e))?;
             log::info!("Script wav_monitor.py iniciado correctamente");
             return Ok(child);
@@ -43,6 +56,8 @@ pub fn start_wav_monitor() -> Result<Child, String> {
             let mut cmd = std::process::Command::new("open");
             cmd.args(&["-a", "Terminal"]);
             cmd.arg(script_path);
+            cmd.arg("--monitor-dir");
+            cmd.arg(&monitor_dir);
             let child = cmd.spawn().map_err(|e| format!("Error al iniciar wav_monitor.py: {}", e))?;
             log::info!("Script wav_monitor.py iniciado correctamente");
             return Ok(child);
@@ -62,6 +77,8 @@ pub fn start_wav_monitor() -> Result<Child, String> {
             return Err(format!("wav_monitor.exe no encontrado en: {:?}", exe_file));
         }
         let mut cmd = std::process::Command::new(exe_file);
+        cmd.arg("--monitor-dir");
+        cmd.arg(&monitor_dir);
         let child = cmd.spawn().map_err(|e| format!("Error al iniciar wav_monitor.exe: {}", e))?;
         log::info!("wav_monitor.exe iniciado correctamente");
         Ok(child)
@@ -70,16 +87,24 @@ pub fn start_wav_monitor() -> Result<Child, String> {
 
 /// Función para iniciar el script wav_monitor_gui.py o wav_monitor_gui.exe según el modo
 pub fn start_wav_monitor_gui() -> Result<Child, String> {
+    // Leo el path del directorio desde running_flag.tmp
+    let flag_path = get_temp_flag_path()?;
+    let monitor_dir = read_file(flag_path.to_string_lossy().as_ref())?.trim().to_string();
     #[cfg(debug_assertions)]
     {
         // En modo debug, ejecuta el .py desde la ruta fuente
-        let script_path = std::path::Path::new("D:/git-edalx/WorkXGoAm/WorkXGoAm/src-python/wav_monitor_gui.py");
+        let script_path = {
+            let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+            manifest_dir.parent().expect("Error al obtener el directorio del proyecto").join("src-python").join("wav_monitor_gui.py")
+        };
         log::info!("Intentando ejecutar el script de Python: {:?}", script_path);
         #[cfg(target_os = "windows")]
         {
             let mut cmd = std::process::Command::new("cmd");
             cmd.args(&["/c", "start", "cmd", "/k", "python"]);
             cmd.arg(script_path);
+            cmd.arg("--monitor-dir");
+            cmd.arg(&monitor_dir);
             let child = cmd.spawn().map_err(|e| format!("Error al iniciar wav_monitor_gui.py: {}", e))?;
             log::info!("Script wav_monitor_gui.py iniciado correctamente");
             return Ok(child);
@@ -89,6 +114,8 @@ pub fn start_wav_monitor_gui() -> Result<Child, String> {
             let mut cmd = std::process::Command::new("gnome-terminal");
             cmd.args(&["--", "python"]);
             cmd.arg(script_path);
+            cmd.arg("--monitor-dir");
+            cmd.arg(&monitor_dir);
             let child = cmd.spawn().map_err(|e| format!("Error al iniciar wav_monitor_gui.py: {}", e))?;
             log::info!("Script wav_monitor_gui.py iniciado correctamente");
             return Ok(child);
@@ -98,6 +125,8 @@ pub fn start_wav_monitor_gui() -> Result<Child, String> {
             let mut cmd = std::process::Command::new("open");
             cmd.args(&["-a", "Terminal"]);
             cmd.arg(script_path);
+            cmd.arg("--monitor-dir");
+            cmd.arg(&monitor_dir);
             let child = cmd.spawn().map_err(|e| format!("Error al iniciar wav_monitor_gui.py: {}", e))?;
             log::info!("Script wav_monitor_gui.py iniciado correctamente");
             return Ok(child);
@@ -117,7 +146,8 @@ pub fn start_wav_monitor_gui() -> Result<Child, String> {
             return Err(format!("wav_monitor_gui.exe no encontrado en: {:?}", exe_file));
         }
         let mut cmd = std::process::Command::new(exe_file);
-
+        cmd.arg("--monitor-dir");
+        cmd.arg(&monitor_dir);
         #[cfg(target_os = "windows")]
         {
             use std::os::windows::process::CommandExt;
