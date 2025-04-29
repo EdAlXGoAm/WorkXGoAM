@@ -126,6 +126,7 @@ mat-card-content {
   font-family: 'Courier New', Courier, monospace;
   white-space: pre-wrap;
   word-break: break-word;
+  text-align: left;
 }
 
 .transcription-container pre {
@@ -151,4 +152,18 @@ mat-card-content {
   100% {
     opacity: 1;
   }
+}
+
+/* Wrapper para acomodar las transcripciones lado a lado */
+.transcriptions-wrapper {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 20px;
+}
+
+/* Ajuste de ancho para que ambas tarjetas tengan el mismo tamaño */
+.transcriptions-wrapper .transcription-card {
+  flex: 1 1 500px; /* mínimo más ancho */
+  max-width: 700px;
 } 

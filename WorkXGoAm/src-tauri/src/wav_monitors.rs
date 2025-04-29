@@ -16,7 +16,7 @@ pub struct WavMonitorGuiProcess {
     pub child: Mutex<Option<Child>>,
 }
 
-/// Función para iniciar el script wav_monitor.py o wav_monitor.exe según el modo
+/// Función para iniciar el script realtime_transcribe.py con los argumentos requeridos
 pub fn start_wav_monitor() -> Result<Child, String> {
     // Leo el path del directorio desde running_flag.tmp
     let flag_path = get_temp_flag_path()?;
@@ -26,7 +26,7 @@ pub fn start_wav_monitor() -> Result<Child, String> {
         // En modo debug, ejecuta el .py desde la ruta fuente
         let script_path = {
             let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-            manifest_dir.parent().expect("Error al obtener el directorio del proyecto").join("src-python").join("wav_monitor.py")
+            manifest_dir.parent().expect("Error al obtener el directorio del proyecto").join("src-python").join("realtime_transcribe.py")
         };
         log::info!("Intentando ejecutar el script de Python: {:?}", script_path);
         #[cfg(target_os = "windows")]
@@ -34,54 +34,50 @@ pub fn start_wav_monitor() -> Result<Child, String> {
             let mut cmd = std::process::Command::new("cmd");
             cmd.args(&["/c", "start", "cmd", "/k", "python"]);
             cmd.arg(script_path);
-            cmd.arg("--monitor-dir");
+            cmd.arg("--source");
+            cmd.arg("output");
+            cmd.arg("--outdir");
             cmd.arg(&monitor_dir);
-            let child = cmd.spawn().map_err(|e| format!("Error al iniciar wav_monitor.py: {}", e))?;
-            log::info!("Script wav_monitor.py iniciado correctamente");
+            cmd.arg("--azure");
+            cmd.arg("--local");
+            cmd.arg("--local-model");
+            cmd.arg("small");
+            let child = cmd.spawn().map_err(|e| format!("Error al iniciar realtime_transcribe.py: {}", e))?;
+            log::info!("Script realtime_transcribe.py iniciado correctamente");
             return Ok(child);
         }
-        #[cfg(target_os = "linux")]
+        #[cfg(not(target_os = "windows"))]
         {
-            let mut cmd = std::process::Command::new("gnome-terminal");
-            cmd.args(&["--", "python"]);
-            cmd.arg(script_path);
-            cmd.arg("--monitor-dir");
-            cmd.arg(&monitor_dir);
-            let child = cmd.spawn().map_err(|e| format!("Error al iniciar wav_monitor.py: {}", e))?;
-            log::info!("Script wav_monitor.py iniciado correctamente");
-            return Ok(child);
-        }
-        #[cfg(target_os = "macos")]
-        {
-            let mut cmd = std::process::Command::new("open");
-            cmd.args(&["-a", "Terminal"]);
-            cmd.arg(script_path);
-            cmd.arg("--monitor-dir");
-            cmd.arg(&monitor_dir);
-            let child = cmd.spawn().map_err(|e| format!("Error al iniciar wav_monitor.py: {}", e))?;
-            log::info!("Script wav_monitor.py iniciado correctamente");
-            return Ok(child);
-        }
-        #[cfg(not(any(target_os = "windows", target_os = "linux", target_os = "macos")))]
-        {
-            return Err("Sistema operativo no soportado para iniciar el script wav_monitor.py".to_string());
+            return Err("Solo implementado para Windows en este cambio".to_string());
         }
     }
     #[cfg(not(debug_assertions))]
     {
-        // En release, ejecuta el .exe desde la ruta del ejecutable
-        let exe_path = std::env::current_exe().map_err(|e| e.to_string())?;
-        let exe_dir = exe_path.parent().ok_or("Failed to get executable directory")?;
-        let exe_file = exe_dir.join("wav_monitor.exe");
-        if !exe_file.exists() {
-            return Err(format!("wav_monitor.exe no encontrado en: {:?}", exe_file));
+        // En release, ejecuta el .py desde la ruta fuente (no .exe)
+        #[cfg(target_os = "windows")]
+        {
+            let script_path = {
+                let exe_path = std::env::current_exe().map_err(|e| e.to_string())?;
+                let exe_dir = exe_path.parent().ok_or("Failed to get executable directory")?;
+                exe_dir.parent().expect("Error al obtener el directorio del proyecto").join("src-python").join("realtime_transcribe.py")
+            };
+            log::info!("Intentando ejecutar el script de Python: {:?}", script_path);
+            let mut cmd = std::process::Command::new("cmd");
+            cmd.args(&["/c", "start", "cmd", "/k", "python"]);
+            cmd.arg(script_path);
+            cmd.arg("--source");
+            cmd.arg("output");
+            cmd.arg("--outdir");
+            cmd.arg(&monitor_dir);
+            cmd.arg("--azure");
+            let child = cmd.spawn().map_err(|e| format!("Error al iniciar realtime_transcribe.py: {}", e))?;
+            log::info!("Script realtime_transcribe.py iniciado correctamente");
+            return Ok(child);
         }
-        let mut cmd = std::process::Command::new(exe_file);
-        cmd.arg("--monitor-dir");
-        cmd.arg(&monitor_dir);
-        let child = cmd.spawn().map_err(|e| format!("Error al iniciar wav_monitor.exe: {}", e))?;
-        log::info!("wav_monitor.exe iniciado correctamente");
-        Ok(child)
+        #[cfg(not(target_os = "windows"))]
+        {
+            return Err("Solo implementado para Windows en este cambio".to_string());
+        }
     }
 }
 

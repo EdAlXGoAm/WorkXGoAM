@@ -46,7 +46,9 @@ export class TestWindowComponent implements OnInit, OnDestroy {
   // Propiedad para almacenar las transcripciones
   transcriptions: string = '';
   transcriptionInterval: any = null;
-  lastKnownFiles: string[] = [];
+  
+  // Propiedad para almacenar las transcripciones en inglés
+  transcriptionsEn: string = '';
   
   // Referencia al contenedor de transcripciones para auto-scroll
   @ViewChild('transcriptionContainer') transcriptionContainer!: ElementRef;
@@ -102,58 +104,59 @@ export class TestWindowComponent implements OnInit, OnDestroy {
   // Método para actualizar las transcripciones
   async updateTranscriptions(): Promise<void> {
     try {
-      // Obtener lista de archivos de transcripción
-      const files: string[] = await invoke('get_transcription_files');
-      
-      // Filtrar para excluir el archivo "contexto.txt"
-      const filteredFiles = files.filter(file => {
-        const filename = file.split(/[\\/]/).pop() || '';
-        return filename !== 'contexto.txt';
-      });
-      
-      // Verificar si hay nuevos archivos para leer
-      const newFiles = filteredFiles.filter(file => !this.lastKnownFiles.includes(file));
-      
-      // Si hay nuevos archivos, leerlos
-      if (newFiles.length > 0) {
-        // Actualizar el último conjunto de archivos conocidos (excluyendo contexto.txt)
-        this.lastKnownFiles = filteredFiles;
-        
-        // Leer el contenido de cada archivo nuevo y agregarlo a las transcripciones
-        let allContent = '';
-        
-        // Ordenar los archivos para procesar los más antiguos primero
-        for (const file of filteredFiles) {
+      // Obtener listas de archivos de transcripción separadas
+      interface TranscriptionFiles { original: string[]; english: string[]; }
+      const filesRes = await invoke<TranscriptionFiles>('get_transcription_files');
+      const spanishFiles = filesRes.original || [];
+      const englishFiles = filesRes.english || [];
+
+      // Función para construir el contenido a partir de los archivos
+      const buildContent = async (files: string[]): Promise<string> => {
+        let content = '';
+        for (const file of files) {
+          // Excluir contexto.txt
+          const filenameOnly = file.split(/[\\/]/).pop() || '';
+          if (filenameOnly === 'contexto.txt') continue;
           try {
-            const content = await invoke<string>('read_transcription_file', { path: file });
-            allContent += `[${this.extractTimestamp(file)}] ${content}\n\n`;
+            const fileContent = await invoke<string>('read_transcription_file', { path: file });
+            content += `[${this.extractTimestamp(file)}] ${fileContent}\n\n`;
           } catch (error) {
             console.error(`Error al leer el archivo ${file}:`, error);
           }
         }
-        
-        // Actualizar el contenido de las transcripciones
-        this.transcriptions = allContent;
-        
-        // Forzar la detección de cambios ya que estamos actualizando desde un intervalo
-        this.cdr.detectChanges();
-        
-        // Hacer scroll hacia abajo para mostrar el contenido más reciente
-        // this.scrollToBottom();
+        return content;
+      };
+
+      // Construir ambos contenidos
+      const [newSpanishContent, newEnglishContent] = await Promise.all([
+        buildContent(spanishFiles),
+        buildContent(englishFiles)
+      ]);
+
+      // Actualizar propiedades solo si hay cambios
+      if (this.transcriptions !== newSpanishContent) {
+        this.transcriptions = newSpanishContent;
       }
+      if (this.transcriptionsEn !== newEnglishContent) {
+        this.transcriptionsEn = newEnglishContent;
+      }
+
+      // Forzar la detección de cambios
+      this.cdr.detectChanges();
+
     } catch (error) {
       console.error('Error al actualizar transcripciones:', error);
     }
   }
   
-  // Método auxiliar para extraer timestamp del nombre del archivo
+  // Método auxiliar para extraer solo la hora del timestamp del nombre del archivo
   private extractTimestamp(filepath: string): string {
     const filename = filepath.split(/[\\/]/).pop() || '';
-    const match = filename.match(/\d{8}_\d{6}/);
+    const match = filename.match(/\d{8}_(\d{6})/);
     if (match) {
-      const timestamp = match[0];
-      // Formatear YYYYMMDD_HHMMSS a YYYY-MM-DD HH:MM:SS
-      return `${timestamp.substring(0, 4)}-${timestamp.substring(4, 6)}-${timestamp.substring(6, 8)} ${timestamp.substring(9, 11)}:${timestamp.substring(11, 13)}:${timestamp.substring(13, 15)}`;
+      const hora = match[1];
+      // Formatear HHMMSS a HH:MM:SS
+      return `${hora.substring(0, 2)}:${hora.substring(2, 4)}:${hora.substring(4, 6)}`;
     }
     return filename;
   }

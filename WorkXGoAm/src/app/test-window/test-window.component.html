@@ -87,18 +87,36 @@
     </mat-card-content>
   </mat-card>
   
-  <!-- Contenedor de transcripciones -->
-  <mat-card class="transcription-card">
-    <mat-card-header>
-      <mat-card-title>Transcripciones de Audio</mat-card-title>
-    </mat-card-header>
-    <mat-card-content>
-      <div class="transcription-container" #transcriptionContainer>
-        <pre *ngIf="transcriptions">{{ transcriptions }}</pre>
-        <div *ngIf="!transcriptions" class="no-transcriptions">
-          No hay transcripciones disponibles. Las transcripciones aparecerán aquí cuando estén disponibles.
+  <!-- Contenedores de transcripciones en paralelo -->
+  <div class="transcriptions-wrapper">
+    <!-- Contenedor de transcripciones en inglés -->
+    <mat-card class="transcription-card">
+      <mat-card-header>
+        <mat-card-title>Transcripciones (Inglés)</mat-card-title>
+      </mat-card-header>
+      <mat-card-content>
+        <div class="transcription-container" #transcriptionContainerEn>
+          <pre *ngIf="transcriptionsEn">{{ transcriptionsEn }}</pre>
+          <div *ngIf="!transcriptionsEn" class="no-transcriptions">
+            No hay transcripciones en inglés disponibles.
+          </div>
         </div>
-      </div>
-    </mat-card-content>
-  </mat-card>
+      </mat-card-content>
+    </mat-card>
+
+    <!-- Contenedor de transcripciones en español (original) -->
+    <mat-card class="transcription-card">
+      <mat-card-header>
+        <mat-card-title>Transcripciones (Español)</mat-card-title>
+      </mat-card-header>
+      <mat-card-content>
+        <div class="transcription-container" #transcriptionContainer>
+          <pre *ngIf="transcriptions">{{ transcriptions }}</pre>
+          <div *ngIf="!transcriptions" class="no-transcriptions">
+            No hay transcripciones disponibles.
+          </div>
+        </div>
+      </mat-card-content>
+    </mat-card>
+  </div>
 </div> 
