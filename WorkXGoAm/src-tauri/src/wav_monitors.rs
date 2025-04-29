@@ -1,14 +1,14 @@
-use std::path::Path;
-use std::process::{Child, Command};
+use std::process::{Child};
 use std::sync::Mutex;
-use log::info;
 
 /// Estructuras para almacenar los procesos de los scripts de Python wav_monitor
+#[allow(dead_code)]
 pub struct WavMonitorProcess {
     pub child: Mutex<Option<Child>>,
 }
 
 /// Estructuras para almacenar los procesos de los scripts de Python wav_monitor_gui
+#[allow(dead_code)]
 pub struct WavMonitorGuiProcess {
     pub child: Mutex<Option<Child>>,
 }

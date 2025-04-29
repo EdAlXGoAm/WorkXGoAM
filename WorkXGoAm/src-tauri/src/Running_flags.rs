@@ -1,4 +1,4 @@
-use std::fs::{remove_file, File};
+use std::fs::{File};
 use std::path::{Path, PathBuf};
 
 // Devuelve la ruta del archivo temporal en AppData/Local/WorkXGoAm
@@ -14,6 +14,7 @@ pub fn get_temp_flag_path() -> Result<PathBuf, String> {
 pub struct TempFlagHandler;
 
 impl TempFlagHandler {
+    #[allow(dead_code)]
     pub fn new() -> Result<Self, String> {
         let temp_file_path = get_temp_flag_path()?;
         File::create(&temp_file_path).map_err(|e| e.to_string())?;
@@ -21,13 +22,3 @@ impl TempFlagHandler {
         Ok(TempFlagHandler)
     }
 }
-
-impl Drop for TempFlagHandler {
-    fn drop(&mut self) {
-        // Solo elimina el archivo temporal running_flag.tmp
-        if let Ok(temp_file_path) = get_temp_flag_path() {
-            let _ = remove_file(&temp_file_path);
-            println!("Temporary file running_flag.tmp removed");
-        }
-    }
-} 

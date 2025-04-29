@@ -1,7 +1,5 @@
 use std::process::{Child, Command};
-use std::path::PathBuf;
 use std::sync::Mutex;
-use log::info;
 
 /// Estructura para almacenar el proceso de WorkXFlaskServer
 pub struct WorkXFlaskServerProcess {
@@ -19,6 +17,7 @@ impl Drop for WorkXFlaskServerProcess {
 }
 
 /// Starts the WorkXFlaskServer and returns the Child for later management
+#[allow(dead_code)]
 pub fn start_workx_flask_server() -> Result<Child, String> {
     // Get Tauri executable path
     let exe_path = std::env::current_exe().map_err(|e| e.to_string())?;

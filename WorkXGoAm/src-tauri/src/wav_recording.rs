@@ -2,12 +2,10 @@ use std::fs::File;
 use std::io::Write;
 use std::sync::{Arc, Mutex};
 use std::collections::VecDeque;
-use std::path::Path;
 use std::time::{Duration, Instant};
-use std::process::Child;
 
 use tauri::{AppHandle, Manager, Emitter};
-use log::{info, error, debug};
+use log::{info, error};
 use chrono::Local;
 use wasapi::{DeviceCollection, Direction, Device, WasapiError, WaveFormat, SampleType, ShareMode};
 
