@@ -32,6 +32,21 @@ popd
 echo wav_monitor compilation completed.
 echo.
 
+REM 1c. Compile realtime_transcribe using PyInstaller
+pushd "src-python"
+echo Compiling realtime_transcribe with PyInstaller...
+pyinstaller "realtime_transcribe.spec"
+if errorlevel 1 (
+    echo An error occurred during realtime_transcribe compilation.
+    popd
+    pause
+    exit /b 1
+)
+popd
+echo realtime_transcribe compilation completed.
+echo.
+
+
 REM 1c. Compile wav_monitor_gui using PyInstaller
 pushd "src-python"
 echo Compiling wav_monitor_gui with PyInstaller...
@@ -97,6 +112,33 @@ copy /Y "%SOURCE_EXE_WAV%" "%DEST_EXE3_WAV%"
 echo.
 echo wav_monitor.exe copy completed.
 echo.
+
+REM 2c. Copy realtime_transcribe.exe after removing destination file (if exists)
+set "SOURCE_EXE_WAV_GUI=src-python\dist\realtime_transcribe.exe"
+set "DEST_EXE1_WAV_GUI=src-tauri\realtime_transcribe.exe"
+set "DEST_EXE2_WAV_GUI=src-tauri\target\debug\realtime_transcribe.exe"
+set "DEST_EXE3_WAV_GUI=src-tauri\target\release\realtime_transcribe.exe"
+
+echo Removing file %DEST_EXE1_WAV_GUI% if exists...
+if exist "%DEST_EXE1_WAV_GUI%" del /f /q "%DEST_EXE1_WAV_GUI%"
+echo Copying realtime_transcribe.exe to %DEST_EXE1_WAV_GUI%...
+copy /Y "%SOURCE_EXE_WAV_GUI%" "%DEST_EXE1_WAV_GUI%"
+echo.
+
+echo Removing file %DEST_EXE2_WAV_GUI% if exists...
+if exist "%DEST_EXE2_WAV_GUI%" del /f /q "%DEST_EXE2_WAV_GUI%"
+echo Copying realtime_transcribe.exe to %DEST_EXE2_WAV_GUI%...
+copy /Y "%SOURCE_EXE_WAV_GUI%" "%DEST_EXE2_WAV_GUI%"
+echo.
+
+echo Removing file %DEST_EXE3_WAV_GUI% if exists...
+if exist "%DEST_EXE3_WAV_GUI%" del /f /q "%DEST_EXE3_WAV_GUI%"
+echo Copying realtime_transcribe.exe to %DEST_EXE3_WAV_GUI%...
+copy /Y "%SOURCE_EXE_WAV_GUI%" "%DEST_EXE3_WAV_GUI%"
+echo.
+echo realtime_transcribe.exe copy completed.
+echo.
+
 
 REM 2c. Copy wav_monitor_gui.exe after removing destination file (if exists)
 set "SOURCE_EXE_WAV_GUI=src-python\dist\wav_monitor_gui.exe"

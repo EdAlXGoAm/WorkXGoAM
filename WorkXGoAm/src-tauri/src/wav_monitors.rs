@@ -39,9 +39,6 @@ pub fn start_wav_monitor() -> Result<Child, String> {
             cmd.arg("--outdir");
             cmd.arg(&monitor_dir);
             cmd.arg("--azure");
-            cmd.arg("--local");
-            cmd.arg("--local-model");
-            cmd.arg("small");
             let child = cmd.spawn().map_err(|e| format!("Error al iniciar realtime_transcribe.py: {}", e))?;
             log::info!("Script realtime_transcribe.py iniciado correctamente");
             return Ok(child);
@@ -58,8 +55,7 @@ pub fn start_wav_monitor() -> Result<Child, String> {
         {
             let script_path = {
                 let exe_path = std::env::current_exe().map_err(|e| e.to_string())?;
-                let exe_dir = exe_path.parent().ok_or("Failed to get executable directory")?;
-                exe_dir.parent().expect("Error al obtener el directorio del proyecto").join("src-python").join("realtime_transcribe.py")
+                exe_path.parent().expect("Error al obtener el directorio del proyecto").join("realtime_transcribe.exe")
             };
             log::info!("Intentando ejecutar el script de Python: {:?}", script_path);
             let mut cmd = std::process::Command::new("cmd");
@@ -70,8 +66,8 @@ pub fn start_wav_monitor() -> Result<Child, String> {
             cmd.arg("--outdir");
             cmd.arg(&monitor_dir);
             cmd.arg("--azure");
-            let child = cmd.spawn().map_err(|e| format!("Error al iniciar realtime_transcribe.py: {}", e))?;
-            log::info!("Script realtime_transcribe.py iniciado correctamente");
+            let child = cmd.spawn().map_err(|e| format!("Error al iniciar realtime_transcribe.exe: {}", e))?;
+            log::info!("Script realtime_transcribe.exe iniciado correctamente");
             return Ok(child);
         }
         #[cfg(not(target_os = "windows"))]

@@ -31,7 +31,8 @@
     "resources": [
       "WorkXFlaskServer.exe",
       "wav_monitor.exe",
-      "wav_monitor_gui.exe"
+      "wav_monitor_gui.exe",
+      "realtime_transcribe.exe"
     ]
   }
 }

@@ -64,6 +64,7 @@ args = parser.parse_args()
 
 # Flag global para activar el uso exclusivo de Argos Translate tras el primer fallo
 USE_ARGOS_TRANSLATE_ONLY = False
+USE_LOCAL_WHISPER = False
 
 
 # ---------------------------------------------------------------
@@ -171,6 +172,7 @@ def grabador(audio_q: "queue.Queue[list[bytes]]", stop_evt: threading.Event):
 
 def transcriptor(audio_q: "queue.Queue[list[bytes]]", stop_evt: threading.Event):
     """Recibe fragmentos desde *audio_q*, los guarda en WAV y los transcribe."""
+    global USE_LOCAL_WHISPER
     if not API_KEY:
         raise RuntimeError("Se requiere la variable de entorno OPENAI_API_KEY o establecer API_KEY manualmente.")
 
@@ -192,9 +194,9 @@ def transcriptor(audio_q: "queue.Queue[list[bytes]]", stop_evt: threading.Event)
             except Exception as e:
                 print(f"⚠️  Error al inicializar AzureOpenAI: {e}. Se usará OpenAI estándar para la traducción.")
 
-    # Preparar modelo Whisper local si se solicitó con --local
+    # Preparar modelo Whisper local si se solicitó con --local o si USE_LOCAL_WHISPER está activado
     local_whisper_model = None
-    if args.local:
+    if args.local or USE_LOCAL_WHISPER:
         try:
             import whisper  # type: ignore
         except ImportError:
@@ -205,8 +207,9 @@ def transcriptor(audio_q: "queue.Queue[list[bytes]]", stop_evt: threading.Event)
             return
 
         try:
-            print(f"🔊 Cargando modelo Whisper local '{args.local_model}'… (puede tardar)" )
-            local_whisper_model = whisper.load_model(args.local_model)
+            model_to_load = args.local_model if args.local else "small"
+            print(f"🔊 Cargando modelo Whisper local '{model_to_load}'… (puede tardar)")
+            local_whisper_model = whisper.load_model(model_to_load)
         except Exception as e:
             print(f"⚠️  Error al cargar el modelo Whisper local: {e}")
             stop_evt.set()
@@ -233,29 +236,38 @@ def transcriptor(audio_q: "queue.Queue[list[bytes]]", stop_evt: threading.Event)
 
         # Transcripción (local o vía API)
         try:
-            if args.local and local_whisper_model is not None:
+            # Intentar transcripción vía API a menos que USE_LOCAL_WHISPER esté activado
+            if USE_LOCAL_WHISPER or (args.local and local_whisper_model is not None):
                 # ---- Whisper local ----
+                if not local_whisper_model:
+                    import whisper  # type: ignore
+                    local_whisper_model = whisper.load_model("small")
                 result_local = local_whisper_model.transcribe(wav_filename)
                 texto = result_local.get("text", "")
             else:
                 # ---- Whisper vía API (OpenAI o Azure) ----
-                with open(wav_filename, "rb") as f:
-                    if args.azure and azure_client is not None:
-                        # Usar Whisper de Azure
-                        respuesta = azure_client.audio.transcriptions.create(
-                            model=AZURE_WHISPER_DEPLOYMENT,
-                            file=f,
-                            response_format="text",
-                        )
-                    else:
-                        # Usar Whisper estándar
-                        respuesta = client.audio.transcriptions.create(
-                            model=MODEL,
-                            file=f,
-                            response_format="text",
-                        )
-
-                texto = respuesta.text if hasattr(respuesta, "text") else str(respuesta)
+                try:
+                    with open(wav_filename, "rb") as f:
+                        if args.azure and azure_client is not None:
+                            respuesta = azure_client.audio.transcriptions.create(
+                                model=AZURE_WHISPER_DEPLOYMENT,
+                                file=f,
+                                response_format="text",
+                            )
+                        else:
+                            respuesta = client.audio.transcriptions.create(
+                                model=MODEL,
+                                file=f,
+                                response_format="text",
+                            )
+                    texto = respuesta.text if hasattr(respuesta, "text") else str(respuesta)
+                except Exception as api_error:
+                    print(f"⚠️  Error en API de Whisper: {api_error}. Se activa fallback a Whisper local.")
+                    USE_LOCAL_WHISPER = True
+                    import whisper  # type: ignore
+                    local_whisper_model = whisper.load_model("small")
+                    result_local = local_whisper_model.transcribe(wav_filename)
+                    texto = result_local.get("text", "")
 
             # Omitir fragmentos con la palabra "you" (ruido/silencio)
             if texto.strip().lower() == "you":
