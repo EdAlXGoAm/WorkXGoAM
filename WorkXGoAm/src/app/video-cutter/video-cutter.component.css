@@ -30,7 +30,7 @@ input[type="number"] {
   overflow: hidden;
 }
 .video-preview-container.show {
-  max-height: 500px;
+  max-height: 800px;
 }
 
 /* Progress bar styling */

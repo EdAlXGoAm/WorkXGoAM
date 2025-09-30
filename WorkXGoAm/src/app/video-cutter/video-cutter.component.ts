@@ -5,6 +5,7 @@ import { ApiService } from '../services/api.service';
 import { Router } from '@angular/router';
 import { open, save } from '@tauri-apps/plugin-dialog';
 import { downloadDir, basename, extname, join } from '@tauri-apps/api/path';
+import { convertFileSrc } from '@tauri-apps/api/core';
 
 @Component({
   selector: 'app-video-cutter',
@@ -50,7 +51,8 @@ export class VideoCutterComponent implements OnInit {
       const dotIndex = name.lastIndexOf('.');
       const nameWithoutExt = dotIndex !== -1 ? name.slice(0, dotIndex) : name;
       const ext = dotIndex !== -1 ? name.slice(dotIndex + 1) : '';
-      const suggested = ext ? `${nameWithoutExt}_clip1.${ext}` : `${nameWithoutExt}_clip1`;
+      const timeSuffix = this.generateTimeSuffix();
+      const suggested = ext ? `${nameWithoutExt}_clip_${timeSuffix}.${ext}` : `${nameWithoutExt}_clip_${timeSuffix}`;
       this.outputPath = await join(defaultDir, suggested);
     } catch (e) {
       console.error('Error seleccionando vídeo de entrada:', e);
@@ -109,6 +111,8 @@ export class VideoCutterComponent implements OnInit {
       inputEl.classList.add('border-red-500');
     } else {
       inputEl.classList.remove('border-red-500');
+      // Actualizar el nombre del archivo de salida con los nuevos tiempos
+      this.updateOutputPathWithTimes();
     }
   }
 
@@ -126,6 +130,8 @@ export class VideoCutterComponent implements OnInit {
     inputEl.classList.remove('border-red-500');
     inputEl.classList.add('border-green-500');
     setTimeout(() => inputEl.classList.remove('border-green-500'), 1000);
+    // Actualizar el nombre del archivo de salida con los nuevos tiempos
+    this.updateOutputPathWithTimes();
   }
 
   private showStatus(message: string, colorClass: string): void {
@@ -135,13 +141,67 @@ export class VideoCutterComponent implements OnInit {
   }
 
   /**
+   * Genera un sufijo con los tiempos de inicio y fin para el nombre del archivo.
+   * Convierte formato HH:MM:SS a H-MM-SS para usar en nombres de archivo.
+   */
+  private generateTimeSuffix(): string {
+    const formatTime = (time: string): string => {
+      // Reemplaza los dos puntos por guiones y elimina ceros iniciales innecesarios
+      const parts = time.split(':');
+      if (parts.length === 3) {
+        const hours = parseInt(parts[0], 10);
+        const minutes = parts[1];
+        const seconds = parts[2];
+        return `${hours}-${minutes}-${seconds}`;
+      }
+      return time.replace(/:/g, '-');
+    };
+
+    const startFormatted = formatTime(this.startTime);
+    const endFormatted = formatTime(this.endTime);
+    return `${startFormatted}_${endFormatted}`;
+  }
+
+  /**
+   * Actualiza el nombre del archivo de salida basándose en los tiempos actuales.
+   * Se llama cuando el usuario cambia los tiempos de inicio o fin.
+   */
+  async updateOutputPathWithTimes(): Promise<void> {
+    if (!this.inputPath || !this.outputPath) {
+      return;
+    }
+
+    try {
+      // Extraer el directorio, nombre base y extensión del outputPath actual
+      const segments = this.outputPath.split(/[\\\/]/);
+      const filename = segments.pop() || '';
+      const directory = segments.join('\\');
+
+      // Obtener el nombre base del archivo de entrada
+      const inputName = await basename(this.inputPath);
+      const dotIndex = inputName.lastIndexOf('.');
+      const inputNameWithoutExt = dotIndex !== -1 ? inputName.slice(0, dotIndex) : inputName;
+      const ext = dotIndex !== -1 ? inputName.slice(dotIndex + 1) : '';
+
+      // Generar nuevo nombre con los tiempos actualizados
+      const timeSuffix = this.generateTimeSuffix();
+      const newFilename = ext ? `${inputNameWithoutExt}_${timeSuffix}.${ext}` : `${inputNameWithoutExt}_${timeSuffix}`;
+
+      // Actualizar el outputPath
+      this.outputPath = directory ? `${directory}\\${newFilename}` : newFilename;
+    } catch (e) {
+      console.error('Error actualizando nombre de salida:', e);
+    }
+  }
+
+  /**
    * Maneja cambios manuales en la ruta de entrada y genera la previsualización leyendo el archivo.
    */
   public handleVideoPathChange(path: string): void {
     this.inputPath = path;
     this.videoPreviewShow = true;
-    // Previsualiza con file://
-    const url = path.startsWith('file://') ? path : `file://${path}`;
+    // Convierte la ruta del archivo a una URL segura para Tauri
+    const url = convertFileSrc(path);
     this.videoPlayer.nativeElement.src = url;
     // Muestra sólo el nombre del archivo
     const segments = path.split(/[\\\/]/);
