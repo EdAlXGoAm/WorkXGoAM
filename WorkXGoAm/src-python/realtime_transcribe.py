@@ -8,6 +8,10 @@ from datetime import datetime
 import pyaudio
 import openai
 from openai import AzureOpenAI  # Azure OpenAI SDK
+from dotenv import load_dotenv
+
+# Cargar variables de entorno desde .env
+load_dotenv()
 
 try:
     import soundcard as sc  # type: ignore
@@ -24,7 +28,7 @@ import numpy as np
 
 # ======================== CONFIGURACIÓN =========================
 # Ajusta tu clave en la variable de entorno OPENAI_API_KEY o aquí
-API_KEY = ""
+API_KEY = os.getenv("OPENAI_API_KEY")
 MODEL = "whisper-1"  # Modelo de transcripción a utilizar
 
 # Parámetros de la captura de audio
@@ -41,7 +45,7 @@ TRANSLATE_MODEL = "gpt-4o"
 AZURE_ENDPOINT = "https://voiceaistudio1905074196.openai.azure.com/"
 AZURE_DEPLOYMENT = "gpt-4.1-mini"  # Nombre de la implementación
 AZURE_API_VERSION = "2025-01-01-preview"
-AZURE_KEY = ""  # Ajusta tu clave en la variable de entorno AZURE_OPENAI_KEY
+AZURE_KEY = os.getenv("AZURE_OPENAI_API_KEY")
 AZURE_TRANSLATE_MODEL = AZURE_DEPLOYMENT
 AZURE_WHISPER_DEPLOYMENT = "whisper"  # Nombre del deployment de Whisper en Azure
 

@@ -15,9 +15,13 @@ import openai
 import sys
 import argparse
 from FileToText import AudioTranscriber as FTTranscriber
+from dotenv import load_dotenv
+
+# Cargar variables de entorno desde .env
+load_dotenv()
 
 # ====== PON AQUÍ TU API KEY DE OPENAI ======
-API_KEY = ""
+API_KEY = os.getenv("OPENAI_API_KEY")
 # ===========================================
 
 # Configurar logging

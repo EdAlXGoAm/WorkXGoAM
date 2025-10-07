@@ -14,6 +14,10 @@ import openai
 import sys
 import argparse
 from FileToText import AudioTranscriber as FTTranscriber
+from dotenv import load_dotenv
+
+# Cargar variables de entorno desde .env
+load_dotenv()
 
 # Configurar logging
 logging.basicConfig(
@@ -38,9 +42,8 @@ SUMMARY_STATE_FILE = ".summary_state.json"  # Archivo para mantener estado del r
 LANGUAGE = "en"
 PROMPT = "Transcribe lo que escuchas, no omitas ninguna palabra"
 
-# ====== PON AQUÍ TU API KEY DE OPENAI ======
-API_KEY = ""
-# ===========================================
+# Cargar API key desde el archivo .env
+API_KEY = os.getenv("OPENAI_API_KEY")
 
 class ContextGenerator:
     """
