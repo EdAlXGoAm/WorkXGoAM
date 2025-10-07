@@ -3,6 +3,7 @@ from flask_cors import CORS
 import sys
 from connection import find_free_port, save_port_info, connection_bp
 from video_service import recortar_video
+from floating_face_manager import FloatingFaceManager
 
 app = Flask(__name__)
 CORS(app)
@@ -33,6 +34,15 @@ if __name__ == '__main__':
     print(f"Starting on port: {port}")
 
     save_port_info(port)
+
+    # Iniciar carita flotante con su gestor
+    # Puedes proporcionar URLs personalizadas para las imágenes PNG (opcional)
+    # Si no se proporcionan o fallan, usará el dibujo manual como fallback
+    face_manager = FloatingFaceManager(
+        happy_face_url="https://cdn-icons-png.flaticon.com/512/8421/8421363.png",  # Reemplaza con tu URL
+        surprised_face_url="https://cdn-icons-png.flaticon.com/512/8421/8421352.png"  # Reemplaza con tu URL
+    )
+    face_manager.start()
 
     extra_files = []
 
