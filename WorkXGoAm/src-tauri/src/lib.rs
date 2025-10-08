@@ -65,6 +65,48 @@ fn cleanup_before_closing() {
     }
 }
 
+// Tauri command to open Test Window in a new window
+#[tauri::command]
+async fn open_test_window(app: tauri::AppHandle) -> Result<(), String> {
+    use tauri::{WebviewUrl, WebviewWindowBuilder};
+    
+    let window_label = format!("test-window-{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs());
+    
+    WebviewWindowBuilder::new(
+        &app,
+        window_label,
+        WebviewUrl::App("test-window".into())
+    )
+    .title("Test Window")
+    .inner_size(1280.0, 720.0)
+    .resizable(true)
+    .build()
+    .map_err(|e| format!("Error creating window: {}", e))?;
+    
+    Ok(())
+}
+
+// Tauri command to open Video Cutter in a new window
+#[tauri::command]
+async fn open_video_cutter(app: tauri::AppHandle) -> Result<(), String> {
+    use tauri::{WebviewUrl, WebviewWindowBuilder};
+    
+    let window_label = format!("video-cutter-{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs());
+    
+    WebviewWindowBuilder::new(
+        &app,
+        window_label,
+        WebviewUrl::App("video-cutter".into())
+    )
+    .title("Video Cutter")
+    .inner_size(1280.0, 720.0)
+    .resizable(true)
+    .build()
+    .map_err(|e| format!("Error creating window: {}", e))?;
+    
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // Inicializar el sistema de logging
@@ -132,7 +174,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             read_file, get_env, audio_lib::get_audio_devices, record_10_secs, start_continuous_recording, stop_continuous_recording, transcription_files_lib::read_transcription_file, transcription_files_lib::get_transcription_files,
-            start_wav_monitor_cmd, start_wav_monitor_gui_cmd
+            start_wav_monitor_cmd, start_wav_monitor_gui_cmd, open_test_window, open_video_cutter
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

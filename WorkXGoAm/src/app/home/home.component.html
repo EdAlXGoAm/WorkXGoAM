@@ -11,9 +11,9 @@
       </div>
       <div class="p-5">
         <p class="text-gray-600 mb-4">Accede a la ventana de pruebas.</p>
-        <a routerLink="/test-window" class="block w-full text-center bg-blue-500 hover:bg-blue-600 text-white py-2 rounded-lg transition-colors">
+        <button (click)="openTestWindow()" class="block w-full text-center bg-blue-500 hover:bg-blue-600 text-white py-2 rounded-lg transition-colors cursor-pointer">
           Abrir
-        </a>
+        </button>
       </div>
     </div>
     <!-- Card Video Cutter -->
@@ -23,9 +23,9 @@
       </div>
       <div class="p-5">
         <p class="text-gray-600 mb-4">Corta y edita tus videos fácilmente.</p>
-        <a routerLink="/video-cutter" class="block w-full text-center bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg transition-colors">
+        <button (click)="openVideoCutter()" class="block w-full text-center bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg transition-colors cursor-pointer">
           Abrir
-        </a>
+        </button>
       </div>
     </div>
   </div>
