@@ -1,17 +1,17 @@
 <div class="bg-gradient-to-br from-indigo-50 to-purple-50 min-h-screen flex items-center justify-center">
-  <div class="container mx-auto px-4 max-w-3xl">
+  <div class="container mx-auto px-4 max-w-xl flex flex-col items-center">
     <!-- Header -->
-    <div class="flex justify-start mb-6">
+    <div class="flex justify-start mb-6 w-full">
       <button (click)="goHome()" class="text-indigo-600 hover:text-indigo-800 font-medium flex items-center">
         <i class="fas fa-arrow-left mr-2"></i> Volver al menú
       </button>
     </div>
-    <header class="text-center mb-12">
+    <header class="text-center mb-12 w-full">
       <h1 class="text-4xl font-bold text-indigo-800 mb-2">Video Cutter</h1>
       <p class="text-gray-600">Recorta tus videos fácilmente seleccionando los tiempos exactos</p>
     </header>
     <!-- Main Card -->
-    <div class="bg-white rounded-xl shadow-xl overflow-hidden transition-all duration-300 hover:shadow-2xl">
+    <div class="bg-white rounded-xl shadow-xl overflow-hidden transition-all duration-300 hover:shadow-2xl w-full">
       <!-- Video Preview Section -->
       <div class="video-preview-container" [class.show]="videoPreviewShow">
         <div class="p-4 bg-gray-100 border-b">
@@ -84,7 +84,7 @@
       </div>
     </div>
     <!-- Status Message -->
-    <div *ngIf="resultMessage" class="mt-6 text-center text-sm {{statusColor}} flex items-center justify-center">
+    <div *ngIf="resultMessage" class="mt-6 text-center text-sm {{statusColor}} flex items-center justify-center w-full">
       <i class="fas fa-info-circle mr-1"></i> {{ resultMessage }}
     </div>
   </div>
