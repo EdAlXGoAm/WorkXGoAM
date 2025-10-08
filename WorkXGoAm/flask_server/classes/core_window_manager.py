@@ -46,10 +46,11 @@ def _global_enum_windows_callback(hwnd, windows_list):
                 
                 try:
                     is_minimized = win32gui.IsIconic(hwnd)
-                    is_maximized = win32gui.IsZoomed(hwnd)
                 except:
                     is_minimized = False
-                    is_maximized = False
+                
+                # IsZoomed no está disponible en todas las versiones de pywin32
+                is_maximized = False
                 
                 window_info = {
                     'hwnd': hwnd,
@@ -253,13 +254,39 @@ class WindowManagerCore:
             True si se minimizó exitosamente
         """
         try:
-            if not win32gui.IsIconic(hwnd):
-                win32gui.ShowWindow(hwnd, win32con.SW_MINIMIZE)
-                self._log(f"Ventana minimizada: {hwnd}")
-                return True
-            return True  # Ya estaba minimizada
+            # Verificar que la ventana es válida
+            if not win32gui.IsWindow(hwnd):
+                self._log(f"Ventana {hwnd} no es válida", "error")
+                return False
+            
+            # Obtener información de la ventana
+            try:
+                title = win32gui.GetWindowText(hwnd)
+                class_name = win32gui.GetClassName(hwnd)
+            except:
+                pass
+            
+            is_iconic_before = win32gui.IsIconic(hwnd)
+            
+            if not is_iconic_before:
+                result = win32gui.ShowWindow(hwnd, win32con.SW_MINIMIZE)
+                
+                # Verificar si se minimizó
+                time.sleep(0.1)  # Pequeña pausa para que Windows procese
+                is_iconic_after = win32gui.IsIconic(hwnd)
+                
+                if is_iconic_after:
+                    self._log(f"✓ Ventana minimizada exitosamente: {hwnd}", "success")
+                    return True
+                else:
+                    self._log(f"✗ La ventana no se minimizó (puede tener estilos especiales): {hwnd}", "warning")
+                    return False
+            else:
+                return True  # Ya estaba minimizada
         except Exception as e:
             self._log(f"Error minimizando ventana {hwnd}: {e}", "error")
+            import traceback
+            self._log(f"Traceback: {traceback.format_exc()}", "error")
             return False
     
     def restore_window(self, hwnd: int) -> bool:
@@ -274,7 +301,6 @@ class WindowManagerCore:
         """
         try:
             win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
-            self._log(f"Ventana restaurada: {hwnd}")
             return True
         except Exception as e:
             self._log(f"Error restaurando ventana {hwnd}: {e}", "error")
@@ -298,8 +324,10 @@ class WindowManagerCore:
                 return False
             
             # Si está minimizada, restaurar primero
-            if win32gui.IsIconic(hwnd):
-                self.restore_window(hwnd)
+            is_iconic = win32gui.IsIconic(hwnd)
+            
+            if is_iconic:
+                restore_result = self.restore_window(hwnd)
                 time.sleep(0.1)
             
             # Aplicar estrategia específica
@@ -309,17 +337,37 @@ class WindowManagerCore:
                 success = self._bring_to_front_simple(hwnd)
             elif strategy == WindowStrategy.FORCE_FOREGROUND:
                 success = self._bring_to_front_force(hwnd)
-            else:  # DEFAULT: MINIMIZE_FIRST se maneja a nivel superior
+            elif strategy == WindowStrategy.MINIMIZE_FIRST:
+                # Fase 1: Minimizar la ventana
+                if self.minimize_window(hwnd):
+                    time.sleep(0.3)
+                    
+                    # Fase 2: Restaurar y traer al frente
+                    if self.restore_window(hwnd):
+                        time.sleep(0.1)
+                        success = self._bring_to_front_force(hwnd)
+                    else:
+                        self._log(f"No se pudo restaurar la ventana", "warning")
+                        success = False
+                else:
+                    self._log(f"No se pudo minimizar la ventana, aplicando FORCE directamente", "warning")
+                    success = self._bring_to_front_force(hwnd)
+            else:
+                self._log(f"Estrategia desconocida, aplicando SIMPLE por defecto", "warning")
                 success = self._bring_to_front_simple(hwnd)
             
             if success:
                 self._trigger_callback('on_window_brought_to_front', hwnd=hwnd)
-                self._log(f"Ventana traída al frente: {hwnd}")
+                self._log(f"✓ Ventana traída al frente: {hwnd}", "success")
+            else:
+                self._log(f"✗ No se pudo traer ventana al frente: {hwnd}", "warning")
             
             return success
             
         except Exception as e:
             self._log(f"Error trayendo ventana {hwnd} al frente: {e}", "error")
+            import traceback
+            self._log(f"Traceback: {traceback.format_exc()}", "error")
             self._trigger_callback('on_error', error=str(e), hwnd=hwnd)
             return False
     
@@ -378,21 +426,19 @@ class WindowManagerCore:
         total_count = len(windows)
         success_count = 0
         
-        self._log(f"Iniciando operación batch con {total_count} ventanas usando estrategia {strategy.value}")
-        
         # Aplicar estrategia MINIMIZE_FIRST
         if strategy == WindowStrategy.MINIMIZE_FIRST:
-            self._log("Fase 1: Minimizando todas las ventanas")
             minimized_count = 0
-            for window in windows:
+            for i, window in enumerate(windows, 1):
                 if self.minimize_window(window['hwnd']):
                     minimized_count += 1
+                    self._log(f"  ✓ Minimizada correctamente", "success")
+                else:
+                    self._log(f"  ✗ No se pudo minimizar", "warning")
                 time.sleep(0.1)
             
-            self._log(f"Minimizadas {minimized_count}/{total_count} ventanas")
             time.sleep(0.5)  # Pausa estratégica
             
-            self._log("Fase 2: Restaurando y trayendo al frente")
         
         # Traer ventanas al frente
         for i, window in enumerate(windows, 1):
@@ -480,7 +526,7 @@ class WindowManagerCore:
                 'window_class': win32gui.GetClassName(hwnd),
                 'is_visible': win32gui.IsWindowVisible(hwnd),
                 'is_minimized': win32gui.IsIconic(hwnd),
-                'is_maximized': win32gui.IsZoomed(hwnd),
+                'is_maximized': False,  # IsZoomed no disponible en todas las versiones
                 'rect': win32gui.GetWindowRect(hwnd)
             }
         except Exception as e:

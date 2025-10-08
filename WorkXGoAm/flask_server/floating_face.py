@@ -25,6 +25,9 @@ class FloatingFace:
         self.drag_offset_x = 0
         self.drag_offset_y = 0
         
+        # Handle de la ventana para acceso externo
+        self.hwnd = None
+        
     def draw_happy_face(self, screen):
         """Dibuja una carita feliz"""
         # Cara (círculo amarillo)
@@ -141,6 +144,7 @@ class FloatingFace:
             
             # Obtener el handle de la ventana
             hwnd = pygame.display.get_wm_info()['window']
+            self.hwnd = hwnd  # Guardar para acceso externo
             
             # Mover la ventana al centro
             ctypes.windll.user32.SetWindowPos(hwnd, -1, x, y, 0, 0, 0x0001)
@@ -155,13 +159,12 @@ class FloatingFace:
             # Constantes de Windows
             GWL_EXSTYLE = -20
             WS_EX_LAYERED = 0x80000
-            WS_EX_TOOLWINDOW = 0x80  # Ocultar de la barra de tareas
             LWA_COLORKEY = 0x1
             
             # Obtener el estilo actual
             ex_style = ctypes.windll.user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
-            # Agregar estilos: LAYERED (transparencia) + TOOLWINDOW (sin barra de tareas)
-            new_style = ex_style | WS_EX_LAYERED | WS_EX_TOOLWINDOW
+            # Agregar solo estilo LAYERED (transparencia) - SIN TOOLWINDOW para que sea visible en barra de tareas
+            new_style = ex_style | WS_EX_LAYERED
             ctypes.windll.user32.SetWindowLongW(hwnd, GWL_EXSTYLE, new_style)
             
             # Establecer el color magenta (255, 0, 255) como transparente

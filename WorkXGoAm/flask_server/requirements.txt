@@ -1,0 +1,7 @@
+flask
+flask-cors
+pygame
+pynput
+pywin32
+psutil
+

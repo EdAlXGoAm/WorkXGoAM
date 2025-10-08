@@ -4,6 +4,7 @@ import sys
 from connection import find_free_port, save_port_info, connection_bp
 from video_service import recortar_video
 from floating_face_manager import FloatingFaceManager
+from classes.core_hotkey_manager import GlobalHotkeyManager
 
 app = Flask(__name__)
 CORS(app)
@@ -35,14 +36,36 @@ if __name__ == '__main__':
 
     save_port_info(port)
 
-    # Iniciar carita flotante con su gestor
-    # Puedes proporcionar URLs personalizadas para las imágenes PNG (opcional)
-    # Si no se proporcionan o fallan, usará el dibujo manual como fallback
+    # ==========================================
+    # CONFIGURACIÓN GLOBAL DE HOTKEYS
+    # ==========================================
+    hotkey_manager = GlobalHotkeyManager(debug_mode=False)
+    
+    # Iniciar carita flotante
     face_manager = FloatingFaceManager(
-        happy_face_url="https://cdn-icons-png.flaticon.com/512/8421/8421363.png",  # Reemplaza con tu URL
-        surprised_face_url="https://cdn-icons-png.flaticon.com/512/8421/8421352.png"  # Reemplaza con tu URL
+        happy_face_url="https://cdn-icons-png.flaticon.com/512/8421/8421363.png",
+        surprised_face_url="https://cdn-icons-png.flaticon.com/512/8421/8421352.png"
     )
     face_manager.start()
+    
+    # Registrar hotkeys globales
+    hotkey_manager.register_hotkey(
+        name="bring_face_to_front",
+        modifiers=['ctrl', 'shift', 'alt'],
+        key='u',
+        callback=face_manager.bring_face_to_front,
+        enabled=True
+    )
+    
+    # Iniciar el listener de hotkeys
+    hotkey_manager.start()
+    
+    # Mostrar hotkeys registrados
+    print("\n" + "="*60)
+    print("HOTKEYS GLOBALES CONFIGURADOS:")
+    for name, combination in hotkey_manager.get_registered_hotkeys().items():
+        print(f"  • {name}: {combination}")
+    print("="*60 + "\n")
 
     extra_files = []
 
