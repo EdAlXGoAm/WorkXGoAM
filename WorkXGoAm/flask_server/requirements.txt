@@ -4,4 +4,5 @@ pygame
 pynput
 pywin32
 psutil
+Pillow>=10.0.0
 

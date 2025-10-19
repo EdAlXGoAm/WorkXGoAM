@@ -3,7 +3,7 @@ from flask_cors import CORS
 import sys
 from connection import find_free_port, save_port_info, connection_bp
 from video_service import recortar_video
-from floating_face_manager import FloatingFaceManager
+from floating_face_manager_tk import FloatingFaceManagerTk
 from classes.core_hotkey_manager import GlobalHotkeyManager
 
 app = Flask(__name__)
@@ -41,19 +41,20 @@ if __name__ == '__main__':
     # ==========================================
     hotkey_manager = GlobalHotkeyManager(debug_mode=False)
     
-    # Iniciar carita flotante
-    face_manager = FloatingFaceManager(
+    # Iniciar carita flotante (versión Tkinter)
+    face_manager = FloatingFaceManagerTk(
         happy_face_url="https://cdn-icons-png.flaticon.com/512/8421/8421363.png",
         surprised_face_url="https://cdn-icons-png.flaticon.com/512/8421/8421352.png"
     )
     face_manager.start()
     
     # Registrar hotkeys globales
+    # CTRL+SHIFT+ALT+U -> Alternar always-on-top (topmost)
     hotkey_manager.register_hotkey(
-        name="bring_face_to_front",
+        name="toggle_face_topmost",
         modifiers=['ctrl', 'shift', 'alt'],
         key='u',
-        callback=face_manager.bring_face_to_front,
+        callback=face_manager.toggle_always_on_top,
         enabled=True
     )
     
