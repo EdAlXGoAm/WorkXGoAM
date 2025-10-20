@@ -29,6 +29,10 @@ class FloatingFaceTk:
         self.always_on_top_enabled = True
         self.use_images = False
 
+        # Callbacks de hover
+        self._on_hover_enter = None  # type: Optional[callable]
+        self._on_hover_leave = None  # type: Optional[callable]
+
         # URLs opcionales
         self.happy_face_url = happy_face_url
         self.surprised_face_url = surprised_face_url
@@ -125,6 +129,7 @@ class FloatingFaceTk:
         self.is_surprised = distance < (self.size // 2 - 10)
         if self.is_surprised != was_surprised:
             self._render()
+            self._emit_hover_changed(self.is_surprised)
 
     def _update_hover_state_from_pointer(self):
         # Recalcula el estado de "sorpresa" en base a la posición global del puntero
@@ -145,8 +150,40 @@ class FloatingFaceTk:
             new_state = inside_window and (distance < (self.size // 2 - 10))
             if not self._dragging and new_state != self.is_surprised:
                 self.is_surprised = new_state
+                self._emit_hover_changed(self.is_surprised)
         except Exception:
             pass
+
+    # ==========================
+    # Callbacks de hover
+    # ==========================
+    def set_on_hover_enter(self, callback):
+        self._on_hover_enter = callback
+
+    def set_on_hover_leave(self, callback):
+        self._on_hover_leave = callback
+
+    def _emit_hover_changed(self, is_inside: bool):
+        try:
+            if is_inside and self._on_hover_enter:
+                self._on_hover_enter()
+            if (not is_inside) and self._on_hover_leave:
+                self._on_hover_leave()
+        except Exception:
+            pass
+
+    # ==========================
+    # Utilidades de ventana
+    # ==========================
+    def get_window_rect(self):
+        if self._root is None:
+            return None
+        try:
+            x = self._root.winfo_rootx()
+            y = self._root.winfo_rooty()
+            return (x, y, self.size, self.size)
+        except Exception:
+            return None
 
     # ==========================
     # Carga de imágenes remotas

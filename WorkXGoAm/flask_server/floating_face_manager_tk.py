@@ -5,6 +5,7 @@ from typing import Optional
 
 from floating_face_tk import FloatingFaceTk
 from classes.core_window_manager import WindowManagerCore, WindowStrategy
+from ui_state import set_face_hover, set_face_rect
 
 
 class FloatingFaceManagerTk:
@@ -15,6 +16,8 @@ class FloatingFaceManagerTk:
         self.window_manager = WindowManagerCore(debug_mode=True)
         self.happy_face_url = happy_face_url
         self.surprised_face_url = surprised_face_url
+        self._hide_timer_active = False
+        self._hide_delay_ms = 350
 
     # ==========================
     # Integración con WindowManagerCore
@@ -54,10 +57,35 @@ class FloatingFaceManagerTk:
         time.sleep(0.4)
         print("Carita Tk iniciada! (CTRL+C para cerrar)\n")
 
+        # Conectar callbacks de hover
+        self.face.set_on_hover_enter(self._on_face_hover_enter)
+        self.face.set_on_hover_leave(self._on_face_hover_leave)
+
     def stop(self):
         if self.face:
             self.face.stop()
             self.face = None
+
+    # ==========================
+    # Callbacks
+    # ==========================
+    def _on_face_hover_enter(self):
+        try:
+            set_face_hover(True)
+            # Cancelar ocultación pendiente
+            self._hide_timer_active = False
+            if self.face:
+                rect = self.face.get_window_rect()
+                if rect:
+                    set_face_rect(rect)
+        except Exception:
+            pass
+
+    def _on_face_hover_leave(self):
+        # Programar ocultación con retardo; se cancela si el mouse entra a la ventana o vuelve a la carita
+        self._hide_timer_active = True
+        set_face_hover(False)
+
 
     def __del__(self):
         self.stop()
