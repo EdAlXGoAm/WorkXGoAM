@@ -16,6 +16,11 @@ export const routes: Routes = [
     path: 'video-cutter',
     loadComponent: () => import('./video-cutter/video-cutter.component').then(m => m.VideoCutterComponent)
   },
+  // Route for Floating Face Popup
+  {
+    path: 'floating-face-popup',
+    loadComponent: () => import('./floating-face-popup/floating-face-popup.component').then(m => m.FloatingFacePopupComponent)
+  },
   // Catch-all: redirect to home
   { path: '**', redirectTo: '' }
 ];

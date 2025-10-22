@@ -4,6 +4,7 @@ import sys
 from connection import find_free_port, save_port_info, connection_bp
 from video_service import recortar_video
 from floating_face_manager_tk import FloatingFaceManagerTk
+from ui_state import set_popup_hover, get_state
 from classes.core_hotkey_manager import GlobalHotkeyManager
 
 app = Flask(__name__)
@@ -23,6 +24,26 @@ def cut_video():
         return jsonify({'status': 'success', 'output': result})
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
+
+# ==========================
+# UI state para coordinación con Tauri
+# ==========================
+@app.route('/ui/state', methods=['GET'])
+def ui_state_get():
+    try:
+        return jsonify({"status": "ok", "data": get_state()})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/ui/popup/hover', methods=['POST'])
+def ui_popup_hover():
+    try:
+        data = request.get_json() or {}
+        hovering = bool(data.get('hover', False))
+        set_popup_hover(hovering)
+        return jsonify({"status": "ok"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 # Set console title (Windows)
 if sys.platform == 'win32':

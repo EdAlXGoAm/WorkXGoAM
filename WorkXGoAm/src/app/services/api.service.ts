@@ -76,4 +76,17 @@ export class ApiService {
       )
     );
   }
+
+  /**
+   * Obtiene el estado UI compartido (hover cara, hover popup, rect cara)
+   */
+  getUiState(): Observable<{ face_hover: boolean; popup_hover: boolean; face_rect: any }>{
+    return this.getApiUrl().pipe(
+      switchMap(baseUrl =>
+        this.http.get<{ status: string; data: { face_hover: boolean; popup_hover: boolean; face_rect: any } }>(`${baseUrl}/ui/state`)
+      ),
+      map(r => r.data),
+      catchError(() => of({ face_hover: false, popup_hover: false, face_rect: null }))
+    )
+  }
 } 

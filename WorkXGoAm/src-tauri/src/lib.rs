@@ -107,6 +107,51 @@ async fn open_video_cutter(app: tauri::AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+// Helper to ensure a single popup window exists
+fn ensure_popup(app: &tauri::AppHandle) -> Result<tauri::WebviewWindow, String> {
+    use tauri::{WebviewUrl, WebviewWindowBuilder};
+    if let Some(w) = app.get_webview_window("floating-face-popup") {
+        return Ok(w);
+    }
+    let w = WebviewWindowBuilder::new(
+        app,
+        "floating-face-popup",
+        WebviewUrl::App("floating-face-popup".into()),
+    )
+    .title("Floating Face Popup")
+    .inner_size(360.0, 540.0)
+    .resizable(true)
+    .always_on_top(true)
+    .decorations(true)
+    .build()
+    .map_err(|e| format!("Error creating floating-face-popup: {}", e))?;
+    Ok(w)
+}
+
+// Show (and optionally position) the popup window
+#[tauri::command]
+async fn show_floating_face_popup(app: tauri::AppHandle, x: Option<f64>, y: Option<f64>) -> Result<(), String> {
+    use tauri::{PhysicalPosition, Position};
+    let w = ensure_popup(&app)?;
+    if let (Some(px), Some(py)) = (x, y) {
+        let pos = Position::Physical(PhysicalPosition { x: px as i32, y: py as i32 });
+        w.set_position(pos).map_err(|e| e.to_string())?;
+    }
+    w.set_always_on_top(true).map_err(|e| e.to_string())?;
+    w.show().map_err(|e| e.to_string())?;
+    w.set_focus().map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+// Hide the popup window if it exists
+#[tauri::command]
+async fn hide_floating_face_popup(app: tauri::AppHandle) -> Result<(), String> {
+    if let Some(w) = app.get_webview_window("floating-face-popup") {
+        w.hide().map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // Inicializar el sistema de logging
@@ -174,7 +219,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             read_file, get_env, audio_lib::get_audio_devices, record_10_secs, start_continuous_recording, stop_continuous_recording, transcription_files_lib::read_transcription_file, transcription_files_lib::get_transcription_files,
-            start_wav_monitor_cmd, start_wav_monitor_gui_cmd, open_test_window, open_video_cutter
+            start_wav_monitor_cmd, start_wav_monitor_gui_cmd, open_test_window, open_video_cutter, show_floating_face_popup, hide_floating_face_popup
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
