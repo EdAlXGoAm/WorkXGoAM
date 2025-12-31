@@ -52,7 +52,7 @@ class FloatingFaceManagerTk:
 
     def start(self):
         self._original_sigint_handler = signal.signal(signal.SIGINT, self._signal_handler)
-        self.face = FloatingFaceTk(size=150, happy_face_url=self.happy_face_url, surprised_face_url=self.surprised_face_url)
+        self.face = FloatingFaceTk(size=75, happy_face_url=self.happy_face_url, surprised_face_url=self.surprised_face_url)
         self.face.start()
         time.sleep(0.4)
         print("Carita Tk iniciada! (CTRL+C para cerrar)\n")
