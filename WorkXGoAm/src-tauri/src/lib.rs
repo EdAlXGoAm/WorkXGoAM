@@ -152,6 +152,47 @@ async fn hide_floating_face_popup(app: tauri::AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+// Open YouTube WebView embebido dentro de la ventana principal
+#[tauri::command]
+async fn open_youtube_webview(app: tauri::AppHandle, x: i32, y: i32, width: i32, height: i32) -> Result<(), String> {
+    use tauri::{WebviewUrl, WebviewBuilder, LogicalPosition, LogicalSize};
+    
+    // Si ya existe el webview, reposicionar
+    if let Some(wv) = app.get_webview("youtube-webview") {
+        wv.set_position(LogicalPosition::new(x as f64, y as f64)).map_err(|e| e.to_string())?;
+        wv.set_size(LogicalSize::new(width as f64, height as f64)).map_err(|e| e.to_string())?;
+        return Ok(());
+    }
+    
+    // Obtener la ventana principal
+    let main_window = app.get_window("main")
+        .ok_or("Main window not found")?;
+    
+    // Crear webview embebido dentro de la ventana principal
+    let webview = WebviewBuilder::new(
+        "youtube-webview",
+        WebviewUrl::External("https://www.youtube.com".parse().unwrap()),
+    )
+    .auto_resize();
+    
+    main_window.add_child(
+        webview,
+        LogicalPosition::new(x as f64, y as f64),
+        LogicalSize::new(width as f64, height as f64),
+    ).map_err(|e| format!("Error creating embedded YouTube webview: {}", e))?;
+    
+    Ok(())
+}
+
+// Close YouTube WebView embebido
+#[tauri::command]
+async fn close_youtube_webview(app: tauri::AppHandle) -> Result<(), String> {
+    if let Some(wv) = app.get_webview("youtube-webview") {
+        wv.close().map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // Inicializar el sistema de logging
@@ -219,7 +260,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             read_file, get_env, audio_lib::get_audio_devices, record_10_secs, start_continuous_recording, stop_continuous_recording, transcription_files_lib::read_transcription_file, transcription_files_lib::get_transcription_files,
-            start_wav_monitor_cmd, start_wav_monitor_gui_cmd, open_test_window, open_video_cutter, show_floating_face_popup, hide_floating_face_popup
+            start_wav_monitor_cmd, start_wav_monitor_gui_cmd, open_test_window, open_video_cutter, show_floating_face_popup, hide_floating_face_popup, open_youtube_webview, close_youtube_webview
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -1,0 +1,44 @@
+<div class="tv-grid">
+  <!-- Cuadrante 1: YouTube WebView -->
+  <div class="quadrant q1" #youtubeContainer>
+    <div class="youtube-placeholder">
+      <span class="loading-text">Cargando YouTube...</span>
+    </div>
+  </div>
+
+  <!-- Cuadrante 2: Widgets -->
+  <div class="quadrant q2">
+    <div class="widgets-container">
+      <!-- Widget de Hora -->
+      <div class="widget time-widget">
+        <div class="time-display">{{ currentTime }}</div>
+        <div class="date-display">{{ currentDate }}</div>
+      </div>
+
+      <!-- Widget de Clima -->
+      <div class="widget weather-widget">
+        <div class="weather-icon">{{ weatherIcon }}</div>
+        <div class="weather-info">
+          <div class="temperature">{{ temperature }}°C</div>
+          <div class="weather-desc">{{ weatherDescription }}</div>
+          <div class="location">Ecatepec de Morelos</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Cuadrante 3: Vacío -->
+  <div class="quadrant q3">
+    <div class="empty-quadrant">
+      <span class="placeholder-text">Cuadrante 3</span>
+    </div>
+  </div>
+
+  <!-- Cuadrante 4: Vacío -->
+  <div class="quadrant q4">
+    <div class="empty-quadrant">
+      <span class="placeholder-text">Cuadrante 4</span>
+    </div>
+  </div>
+</div>
+

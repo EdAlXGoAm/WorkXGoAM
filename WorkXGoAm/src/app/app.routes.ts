@@ -21,6 +21,11 @@ export const routes: Routes = [
     path: 'floating-face-popup',
     loadComponent: () => import('./floating-face-popup/floating-face-popup.component').then(m => m.FloatingFacePopupComponent)
   },
+  // Route for TV ZonaYummy
+  {
+    path: 'tv_zonayummy',
+    loadComponent: () => import('./tv-zonayummy/tv-zonayummy.component').then(m => m.TvZonayummyComponent)
+  },
   // Catch-all: redirect to home
   { path: '**', redirectTo: '' }
 ];

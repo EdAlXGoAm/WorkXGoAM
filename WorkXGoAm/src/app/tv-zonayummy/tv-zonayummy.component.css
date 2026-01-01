@@ -1,0 +1,143 @@
+/* TV ZonaYummy Layout */
+
+.tv-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  width: 100vw;
+  height: 100vh;
+  gap: 0;
+  background: #0a0a0a;
+}
+
+.quadrant {
+  position: relative;
+  overflow: hidden;
+}
+
+/* Cuadrante 1: YouTube */
+.q1 {
+  background: #000;
+  border-right: 1px solid #222;
+  border-bottom: 1px solid #222;
+}
+
+.youtube-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #1a1a1a 0%, #0d0d0d 100%);
+}
+
+.loading-text {
+  color: #666;
+  font-size: 1.2rem;
+  font-family: 'Segoe UI', Arial, sans-serif;
+}
+
+/* Cuadrante 2: Widgets */
+.q2 {
+  background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%);
+  border-bottom: 1px solid #222;
+  padding: 24px;
+}
+
+.widgets-container {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  height: 100%;
+}
+
+.widget {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 16px;
+  padding: 24px;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Widget de Hora */
+.time-widget {
+  text-align: center;
+}
+
+.time-display {
+  font-size: 3.5rem;
+  font-weight: 300;
+  color: #fff;
+  font-family: 'Segoe UI', Arial, sans-serif;
+  letter-spacing: 2px;
+  text-shadow: 0 0 20px rgba(102, 126, 234, 0.5);
+}
+
+.date-display {
+  font-size: 1.1rem;
+  color: #aaa;
+  margin-top: 8px;
+  text-transform: capitalize;
+  font-family: 'Segoe UI', Arial, sans-serif;
+}
+
+/* Widget de Clima */
+.weather-widget {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.weather-icon {
+  font-size: 4rem;
+  line-height: 1;
+}
+
+.weather-info {
+  flex: 1;
+}
+
+.temperature {
+  font-size: 2.5rem;
+  font-weight: 300;
+  color: #fff;
+  font-family: 'Segoe UI', Arial, sans-serif;
+}
+
+.weather-desc {
+  font-size: 1rem;
+  color: #aaa;
+  margin-top: 4px;
+  text-transform: capitalize;
+}
+
+.location {
+  font-size: 0.85rem;
+  color: #666;
+  margin-top: 8px;
+}
+
+/* Cuadrantes vacíos */
+.q3 {
+  background: linear-gradient(135deg, #1a1a1a 0%, #0d0d0d 100%);
+  border-right: 1px solid #222;
+}
+
+.q4 {
+  background: linear-gradient(135deg, #1a1a1a 0%, #0d0d0d 100%);
+}
+
+.empty-quadrant {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.placeholder-text {
+  color: #333;
+  font-size: 1rem;
+  font-family: 'Segoe UI', Arial, sans-serif;
+}
+
