@@ -51,6 +51,9 @@
           </span>
         </div>
       </div>
+      <button class="refresh-camera-btn" (click)="refreshCameraStream()" [disabled]="isRefreshing" title="Refrescar cámara">
+        <span class="refresh-icon" [class.spinning]="isRefreshing">🔄</span>
+      </button>
     </div>
   </div>
 

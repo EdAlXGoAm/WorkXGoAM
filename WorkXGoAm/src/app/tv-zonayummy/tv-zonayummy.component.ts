@@ -22,12 +22,14 @@ export class TvZonayummyComponent implements OnInit, OnDestroy, AfterViewInit {
   cameraStreamUrl = '';
   cameraStreamActive = false;
   cameraStreamError = '';
+  isRefreshing = false;
   private readonly CAMERA_STREAM_ID = 'security_cam';
   private readonly CAMERA_RTSP_URL = 'rtsp://edalxgoam:FeDiPeExNaPo@192.168.100.14:554/stream1';
   private readonly FLASK_BASE_URL = 'http://127.0.0.1:8080';
 
   private timeInterval: any = null;
   private weatherInterval: any = null;
+  private cameraRefreshInterval: any = null;
   private resizeTimeout: any = null;
 
   ngOnInit(): void {
@@ -52,6 +54,9 @@ export class TvZonayummyComponent implements OnInit, OnDestroy, AfterViewInit {
     }
     if (this.weatherInterval) {
       clearInterval(this.weatherInterval);
+    }
+    if (this.cameraRefreshInterval) {
+      clearInterval(this.cameraRefreshInterval);
     }
     if (this.resizeTimeout) {
       clearTimeout(this.resizeTimeout);
@@ -80,9 +85,14 @@ export class TvZonayummyComponent implements OnInit, OnDestroy, AfterViewInit {
         if (data.status === 'ok') {
           // Pequeña pausa para que FFmpeg inicie
           await new Promise(resolve => setTimeout(resolve, 1000));
-          this.cameraStreamUrl = `${this.FLASK_BASE_URL}/stream/feed/${this.CAMERA_STREAM_ID}`;
+          // Agregar timestamp para forzar recarga del navegador
+          const timestamp = new Date().getTime();
+          this.cameraStreamUrl = `${this.FLASK_BASE_URL}/stream/feed/${this.CAMERA_STREAM_ID}?t=${timestamp}`;
           this.cameraStreamActive = true;
           console.log('Camera stream started:', this.cameraStreamUrl);
+          
+          // Iniciar el intervalo de refresco automático cada minuto
+          this.startAutoRefresh();
         } else {
           this.cameraStreamError = data.message || 'Error iniciando stream';
         }
@@ -112,6 +122,41 @@ export class TvZonayummyComponent implements OnInit, OnDestroy, AfterViewInit {
   onCameraError(): void {
     this.cameraStreamError = 'Error cargando el stream de la cámara';
     this.cameraStreamActive = false;
+  }
+
+  private startAutoRefresh(): void {
+    // Limpiar intervalo anterior si existe
+    if (this.cameraRefreshInterval) {
+      clearInterval(this.cameraRefreshInterval);
+    }
+    
+    // Iniciar intervalo de refresco cada minuto (60000 ms)
+    this.cameraRefreshInterval = setInterval(() => {
+      this.refreshCameraStream();
+    }, 60000);
+  }
+
+  async refreshCameraStream(): Promise<void> {
+    if (this.isRefreshing) return;
+    
+    this.isRefreshing = true;
+    this.cameraStreamActive = false;
+    
+    try {
+      // Detener el stream actual
+      await this.stopCameraStream();
+      
+      // Esperar un momento antes de reiniciar
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Reiniciar el stream
+      await this.startCameraStream();
+    } catch (error) {
+      console.error('Error refreshing camera stream:', error);
+      this.cameraStreamError = 'Error al refrescar el stream';
+    } finally {
+      this.isRefreshing = false;
+    }
   }
 
   @HostListener('window:resize')
