@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, Response
 from flask_cors import CORS
 import sys
 import time
@@ -9,6 +9,7 @@ from floating_face_manager_tk import FloatingFaceManagerTk
 from ui_state import set_popup_hover, get_state, set_auto_hide_rdp, get_auto_hide_rdp, set_on_face_hover_callback
 from classes.core_hotkey_manager import GlobalHotkeyManager
 from classes.core_window_manager import WindowManagerCore
+from rtsp_stream_service import rtsp_service
 
 app = Flask(__name__)
 CORS(app)
@@ -158,6 +159,82 @@ def minimize_remote_desktop():
             "message": f"Minimizadas {result['minimized_count']} ventana(s) de escritorio remoto",
             "minimized_count": result['minimized_count'],
             "focus_transferred": result['focus_transferred']
+        })
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+# ==========================
+# RTSP Stream Endpoints
+# ==========================
+@app.route('/stream/start', methods=['POST'])
+def stream_start():
+    """
+    Inicia un stream RTSP.
+    Body JSON: { "stream_id": "camera1", "rtsp_url": "rtsp://..." }
+    """
+    try:
+        data = request.get_json() or {}
+        stream_id = data.get('stream_id', 'default')
+        rtsp_url = data.get('rtsp_url')
+        
+        if not rtsp_url:
+            return jsonify({"status": "error", "message": "rtsp_url es requerido"}), 400
+        
+        success = rtsp_service.start_stream(stream_id, rtsp_url)
+        if success:
+            return jsonify({
+                "status": "ok",
+                "message": f"Stream '{stream_id}' iniciado",
+                "stream_url": f"/stream/feed/{stream_id}"
+            })
+        else:
+            return jsonify({"status": "error", "message": "Error iniciando stream"}), 500
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/stream/stop', methods=['POST'])
+def stream_stop():
+    """
+    Detiene un stream RTSP.
+    Body JSON: { "stream_id": "camera1" }
+    """
+    try:
+        data = request.get_json() or {}
+        stream_id = data.get('stream_id', 'default')
+        
+        success = rtsp_service.stop_stream(stream_id)
+        return jsonify({
+            "status": "ok",
+            "message": f"Stream '{stream_id}' detenido" if success else f"Stream '{stream_id}' no encontrado"
+        })
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/stream/feed/<stream_id>')
+def stream_feed(stream_id: str):
+    """
+    Endpoint que sirve el stream MJPEG.
+    Usar como src de un tag <img> para visualizar.
+    """
+    generator = rtsp_service.get_frame_generator(stream_id)
+    if generator is None:
+        return jsonify({"status": "error", "message": f"Stream '{stream_id}' no encontrado"}), 404
+    
+    return Response(
+        generator,
+        mimetype='multipart/x-mixed-replace; boundary=frame'
+    )
+
+@app.route('/stream/status')
+def stream_status():
+    """
+    Retorna el estado de los streams activos.
+    """
+    try:
+        active_streams = rtsp_service.get_active_streams()
+        return jsonify({
+            "status": "ok",
+            "active_streams": active_streams
         })
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500

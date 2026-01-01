@@ -18,6 +18,14 @@ export class TvZonayummyComponent implements OnInit, OnDestroy, AfterViewInit {
   weatherDescription = '';
   weatherIcon = '🌡️';
 
+  // Stream de cámara
+  cameraStreamUrl = '';
+  cameraStreamActive = false;
+  cameraStreamError = '';
+  private readonly CAMERA_STREAM_ID = 'security_cam';
+  private readonly CAMERA_RTSP_URL = 'rtsp://edalxgoam:FeDiPeExNaPo@192.168.100.14:554/stream1';
+  private readonly FLASK_BASE_URL = 'http://127.0.0.1:8080';
+
   private timeInterval: any = null;
   private weatherInterval: any = null;
   private resizeTimeout: any = null;
@@ -28,6 +36,9 @@ export class TvZonayummyComponent implements OnInit, OnDestroy, AfterViewInit {
     
     this.fetchWeather();
     this.weatherInterval = setInterval(() => this.fetchWeather(), 600000); // cada 10 min
+
+    // Iniciar stream de cámara
+    this.startCameraStream();
   }
 
   ngAfterViewInit(): void {
@@ -46,6 +57,61 @@ export class TvZonayummyComponent implements OnInit, OnDestroy, AfterViewInit {
       clearTimeout(this.resizeTimeout);
     }
     this.closeYouTubeWebview();
+    this.stopCameraStream();
+  }
+
+  // ========================
+  // Camera Stream Methods
+  // ========================
+  private async startCameraStream(): Promise<void> {
+    try {
+      this.cameraStreamError = '';
+      const response = await fetch(`${this.FLASK_BASE_URL}/stream/start`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          stream_id: this.CAMERA_STREAM_ID,
+          rtsp_url: this.CAMERA_RTSP_URL
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.status === 'ok') {
+          // Pequeña pausa para que FFmpeg inicie
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          this.cameraStreamUrl = `${this.FLASK_BASE_URL}/stream/feed/${this.CAMERA_STREAM_ID}`;
+          this.cameraStreamActive = true;
+          console.log('Camera stream started:', this.cameraStreamUrl);
+        } else {
+          this.cameraStreamError = data.message || 'Error iniciando stream';
+        }
+      } else {
+        this.cameraStreamError = 'Error de conexión con el servidor';
+      }
+    } catch (error) {
+      console.error('Error starting camera stream:', error);
+      this.cameraStreamError = 'No se pudo conectar al servidor';
+    }
+  }
+
+  private async stopCameraStream(): Promise<void> {
+    try {
+      await fetch(`${this.FLASK_BASE_URL}/stream/stop`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stream_id: this.CAMERA_STREAM_ID })
+      });
+      this.cameraStreamActive = false;
+      this.cameraStreamUrl = '';
+    } catch (error) {
+      console.error('Error stopping camera stream:', error);
+    }
+  }
+
+  onCameraError(): void {
+    this.cameraStreamError = 'Error cargando el stream de la cámara';
+    this.cameraStreamActive = false;
   }
 
   @HostListener('window:resize')

@@ -27,10 +27,30 @@
     </div>
   </div>
 
-  <!-- Cuadrante 3: Vacío -->
+  <!-- Cuadrante 3: Cámara de Seguridad -->
   <div class="quadrant q3">
-    <div class="empty-quadrant">
-      <span class="placeholder-text">Cuadrante 3</span>
+    <div class="camera-container">
+      <div class="camera-header">
+        <span class="camera-icon">📹</span>
+        <span class="camera-title">Cámara de Seguridad</span>
+        <span class="camera-status" [class.active]="cameraStreamActive" [class.error]="cameraStreamError">
+          {{ cameraStreamActive ? '● EN VIVO' : (cameraStreamError ? '● ERROR' : '● CONECTANDO...') }}
+        </span>
+      </div>
+      <div class="camera-feed">
+        <img 
+          *ngIf="cameraStreamUrl && !cameraStreamError" 
+          [src]="cameraStreamUrl" 
+          alt="Cámara de seguridad"
+          class="camera-image"
+          (error)="onCameraError()">
+        <div *ngIf="!cameraStreamUrl || cameraStreamError" class="camera-placeholder">
+          <span class="camera-placeholder-icon">📷</span>
+          <span class="camera-placeholder-text">
+            {{ cameraStreamError || 'Iniciando stream...' }}
+          </span>
+        </div>
+      </div>
     </div>
   </div>
 
