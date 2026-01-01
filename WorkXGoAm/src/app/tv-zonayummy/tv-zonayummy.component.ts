@@ -2,6 +2,9 @@ import { Component, OnInit, OnDestroy, ElementRef, ViewChild, AfterViewInit, Hos
 import { CommonModule } from '@angular/common';
 import { invoke } from '@tauri-apps/api/core';
 
+// Declarar Hls como tipo global (cargado desde CDN)
+declare var Hls: any;
+
 @Component({
   selector: 'app-tv-zonayummy',
   standalone: true,
@@ -11,6 +14,7 @@ import { invoke } from '@tauri-apps/api/core';
 })
 export class TvZonayummyComponent implements OnInit, OnDestroy, AfterViewInit {
   @ViewChild('youtubeContainer') youtubeContainer!: ElementRef<HTMLDivElement>;
+  @ViewChild('cameraVideo') cameraVideo!: ElementRef<HTMLVideoElement>;
 
   currentTime = '';
   currentDate = '';
@@ -22,6 +26,7 @@ export class TvZonayummyComponent implements OnInit, OnDestroy, AfterViewInit {
   cameraStreamUrl = '';
   cameraStreamActive = false;
   cameraStreamError = '';
+  cameraStreamMode = 'hls'; // 'hls' o 'mjpeg'
   isRefreshing = false;
   private readonly CAMERA_STREAM_ID = 'security_cam';
   private readonly CAMERA_RTSP_URL = 'rtsp://edalxgoam:FeDiPeExNaPo@192.168.100.14:554/stream1';
@@ -31,6 +36,7 @@ export class TvZonayummyComponent implements OnInit, OnDestroy, AfterViewInit {
   private weatherInterval: any = null;
   private cameraRefreshInterval: any = null;
   private resizeTimeout: any = null;
+  private hlsInstance: any = null;
 
   ngOnInit(): void {
     this.updateTime();
@@ -39,8 +45,11 @@ export class TvZonayummyComponent implements OnInit, OnDestroy, AfterViewInit {
     this.fetchWeather();
     this.weatherInterval = setInterval(() => this.fetchWeather(), 600000); // cada 10 min
 
-    // Iniciar stream de cámara
-    this.startCameraStream();
+    // Cargar hls.js desde CDN
+    this.loadHlsScript().then(() => {
+      // Iniciar stream de cámara después de cargar hls.js
+      this.startCameraStream();
+    });
   }
 
   ngAfterViewInit(): void {
@@ -61,8 +70,26 @@ export class TvZonayummyComponent implements OnInit, OnDestroy, AfterViewInit {
     if (this.resizeTimeout) {
       clearTimeout(this.resizeTimeout);
     }
+    if (this.hlsInstance) {
+      this.hlsInstance.destroy();
+      this.hlsInstance = null;
+    }
     this.closeYouTubeWebview();
     this.stopCameraStream();
+  }
+
+  private loadHlsScript(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      if (typeof Hls !== 'undefined') {
+        resolve();
+        return;
+      }
+      const script = document.createElement('script');
+      script.src = 'https://cdn.jsdelivr.net/npm/hls.js@latest';
+      script.onload = () => resolve();
+      script.onerror = () => reject(new Error('Error cargando hls.js'));
+      document.head.appendChild(script);
+    });
   }
 
   // ========================
@@ -76,22 +103,30 @@ export class TvZonayummyComponent implements OnInit, OnDestroy, AfterViewInit {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           stream_id: this.CAMERA_STREAM_ID,
-          rtsp_url: this.CAMERA_RTSP_URL
+          rtsp_url: this.CAMERA_RTSP_URL,
+          with_audio: true  // HLS con audio
         })
       });
 
       if (response.ok) {
         const data = await response.json();
         if (data.status === 'ok') {
-          // Pequeña pausa para que FFmpeg inicie
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          // Agregar timestamp para forzar recarga del navegador
-          const timestamp = new Date().getTime();
-          this.cameraStreamUrl = `${this.FLASK_BASE_URL}/stream/feed/${this.CAMERA_STREAM_ID}?t=${timestamp}`;
-          this.cameraStreamActive = true;
-          console.log('Camera stream started:', this.cameraStreamUrl);
+          this.cameraStreamMode = data.mode || 'hls';
           
-          // Iniciar el intervalo de refresco automático cada minuto
+          // Pausa para que FFmpeg genere los primeros segmentos HLS
+          const waitTime = this.cameraStreamMode === 'hls' ? 4000 : 1000;
+          await new Promise(resolve => setTimeout(resolve, waitTime));
+          
+          this.cameraStreamUrl = `${this.FLASK_BASE_URL}${data.stream_url}`;
+          this.cameraStreamActive = true;
+          console.log(`Camera stream started (${this.cameraStreamMode}):`, this.cameraStreamUrl);
+          
+          // Si es HLS, inicializar el reproductor
+          if (this.cameraStreamMode === 'hls') {
+            setTimeout(() => this.initHlsPlayer(), 100);
+          }
+          
+          // Iniciar el intervalo de refresco automático cada 5 minutos para HLS
           this.startAutoRefresh();
         } else {
           this.cameraStreamError = data.message || 'Error iniciando stream';
@@ -105,8 +140,59 @@ export class TvZonayummyComponent implements OnInit, OnDestroy, AfterViewInit {
     }
   }
 
+  private initHlsPlayer(): void {
+    const video = this.cameraVideo?.nativeElement;
+    if (!video) {
+      console.error('Video element not found');
+      return;
+    }
+
+    // Destruir instancia anterior si existe
+    if (this.hlsInstance) {
+      this.hlsInstance.destroy();
+      this.hlsInstance = null;
+    }
+
+    if (typeof Hls !== 'undefined' && Hls.isSupported()) {
+      this.hlsInstance = new Hls({
+        debug: false,
+        enableWorker: true,
+        lowLatencyMode: true,
+        backBufferLength: 90
+      });
+      
+      this.hlsInstance.loadSource(this.cameraStreamUrl);
+      this.hlsInstance.attachMedia(video);
+      
+      this.hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => {
+        video.play().catch((e: any) => console.log('Autoplay prevented:', e));
+      });
+      
+      this.hlsInstance.on(Hls.Events.ERROR, (event: any, data: any) => {
+        if (data.fatal) {
+          console.error('HLS fatal error:', data);
+          this.cameraStreamError = 'Error en el stream de video';
+        }
+      });
+    } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+      // Safari nativo
+      video.src = this.cameraStreamUrl;
+      video.addEventListener('loadedmetadata', () => {
+        video.play().catch((e: any) => console.log('Autoplay prevented:', e));
+      });
+    } else {
+      this.cameraStreamError = 'Tu navegador no soporta HLS';
+    }
+  }
+
   private async stopCameraStream(): Promise<void> {
     try {
+      // Destruir reproductor HLS
+      if (this.hlsInstance) {
+        this.hlsInstance.destroy();
+        this.hlsInstance = null;
+      }
+      
       await fetch(`${this.FLASK_BASE_URL}/stream/stop`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -125,15 +211,15 @@ export class TvZonayummyComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   private startAutoRefresh(): void {
-    // Limpiar intervalo anterior si existe
     if (this.cameraRefreshInterval) {
       clearInterval(this.cameraRefreshInterval);
     }
     
-    // Iniciar intervalo de refresco cada minuto (60000 ms)
+    // Refrescar cada 5 minutos para HLS (menos frecuente que MJPEG)
+    const refreshInterval = this.cameraStreamMode === 'hls' ? 300000 : 60000;
     this.cameraRefreshInterval = setInterval(() => {
       this.refreshCameraStream();
-    }, 60000);
+    }, refreshInterval);
   }
 
   async refreshCameraStream(): Promise<void> {
@@ -143,13 +229,8 @@ export class TvZonayummyComponent implements OnInit, OnDestroy, AfterViewInit {
     this.cameraStreamActive = false;
     
     try {
-      // Detener el stream actual
       await this.stopCameraStream();
-      
-      // Esperar un momento antes de reiniciar
       await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // Reiniciar el stream
       await this.startCameraStream();
     } catch (error) {
       console.error('Error refreshing camera stream:', error);

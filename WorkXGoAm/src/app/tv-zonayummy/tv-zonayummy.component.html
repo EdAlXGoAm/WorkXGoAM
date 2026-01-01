@@ -38,16 +38,28 @@
         </span>
       </div>
       <div class="camera-feed">
+        <!-- Video player para HLS (con audio) -->
+        <video 
+          *ngIf="cameraStreamMode === 'hls' && cameraStreamUrl && !cameraStreamError"
+          #cameraVideo
+          class="camera-video"
+          autoplay
+          controls
+          playsinline
+          (error)="onCameraError()">
+        </video>
+        <!-- Imagen para MJPEG (sin audio) -->
         <img 
-          *ngIf="cameraStreamUrl && !cameraStreamError" 
+          *ngIf="cameraStreamMode === 'mjpeg' && cameraStreamUrl && !cameraStreamError" 
           [src]="cameraStreamUrl" 
           alt="Cámara de seguridad"
           class="camera-image"
           (error)="onCameraError()">
+        <!-- Placeholder cuando no hay stream -->
         <div *ngIf="!cameraStreamUrl || cameraStreamError" class="camera-placeholder">
           <span class="camera-placeholder-icon">📷</span>
           <span class="camera-placeholder-text">
-            {{ cameraStreamError || 'Iniciando stream...' }}
+            {{ cameraStreamError || 'Iniciando stream con audio...' }}
           </span>
         </div>
       </div>

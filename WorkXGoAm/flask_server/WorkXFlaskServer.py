@@ -170,22 +170,34 @@ def minimize_remote_desktop():
 def stream_start():
     """
     Inicia un stream RTSP.
-    Body JSON: { "stream_id": "camera1", "rtsp_url": "rtsp://..." }
+    Body JSON: { 
+        "stream_id": "camera1", 
+        "rtsp_url": "rtsp://...",
+        "with_audio": true  // true=HLS con audio, false=MJPEG sin audio
+    }
     """
     try:
         data = request.get_json() or {}
         stream_id = data.get('stream_id', 'default')
         rtsp_url = data.get('rtsp_url')
+        with_audio = data.get('with_audio', True)
         
         if not rtsp_url:
             return jsonify({"status": "error", "message": "rtsp_url es requerido"}), 400
         
-        success = rtsp_service.start_stream(stream_id, rtsp_url)
+        success = rtsp_service.start_stream(stream_id, rtsp_url, with_audio=with_audio)
         if success:
+            mode = rtsp_service.get_stream_mode(stream_id)
+            if mode == 'hls':
+                stream_url = f"/stream/hls/{stream_id}/stream.m3u8"
+            else:
+                stream_url = f"/stream/feed/{stream_id}"
+            
             return jsonify({
                 "status": "ok",
                 "message": f"Stream '{stream_id}' iniciado",
-                "stream_url": f"/stream/feed/{stream_id}"
+                "stream_url": stream_url,
+                "mode": mode
             })
         else:
             return jsonify({"status": "error", "message": "Error iniciando stream"}), 500
@@ -218,12 +230,37 @@ def stream_feed(stream_id: str):
     """
     generator = rtsp_service.get_frame_generator(stream_id)
     if generator is None:
-        return jsonify({"status": "error", "message": f"Stream '{stream_id}' no encontrado"}), 404
+        return jsonify({"status": "error", "message": f"Stream '{stream_id}' no encontrado o no es MJPEG"}), 404
     
     return Response(
         generator,
         mimetype='multipart/x-mixed-replace; boundary=frame'
     )
+
+@app.route('/stream/hls/<stream_id>/<path:filename>')
+def stream_hls(stream_id: str, filename: str):
+    """
+    Sirve archivos HLS (.m3u8 y .ts) para un stream.
+    """
+    from flask import send_from_directory
+    
+    stream_dir = rtsp_service.get_hls_directory(stream_id)
+    if stream_dir is None:
+        return jsonify({"status": "error", "message": f"Stream HLS '{stream_id}' no encontrado"}), 404
+    
+    # Determinar el mimetype correcto
+    if filename.endswith('.m3u8'):
+        mimetype = 'application/vnd.apple.mpegurl'
+    elif filename.endswith('.ts'):
+        mimetype = 'video/mp2t'
+    else:
+        mimetype = 'application/octet-stream'
+    
+    response = send_from_directory(stream_dir, filename, mimetype=mimetype)
+    # Headers para evitar cache y permitir CORS
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    return response
 
 @app.route('/stream/status')
 def stream_status():
@@ -232,9 +269,13 @@ def stream_status():
     """
     try:
         active_streams = rtsp_service.get_active_streams()
+        streams_info = []
+        for sid in active_streams:
+            mode = rtsp_service.get_stream_mode(sid)
+            streams_info.append({"id": sid, "mode": mode})
         return jsonify({
             "status": "ok",
-            "active_streams": active_streams
+            "active_streams": streams_info
         })
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
