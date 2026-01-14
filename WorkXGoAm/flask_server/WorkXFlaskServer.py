@@ -6,7 +6,7 @@ import ctypes
 from connection import find_free_port, save_port_info, connection_bp
 from video_service import recortar_video
 from floating_face_manager_tk import FloatingFaceManagerTk
-from ui_state import set_popup_hover, get_state, set_auto_hide_rdp, get_auto_hide_rdp, set_on_face_hover_callback
+from ui_state import set_popup_hover, get_state, set_auto_hide_rdp, get_auto_hide_rdp, set_on_face_hover_callback, set_use_partner_room, get_use_partner_room
 from classes.core_hotkey_manager import GlobalHotkeyManager
 from classes.core_window_manager import WindowManagerCore
 from rtsp_stream_service import rtsp_service
@@ -54,29 +54,46 @@ def click_bottom_left_corner():
 
 def minimize_rdp_and_focus():
     """
-    Función para minimizar RDP y transferir foco.
+    Función para minimizar RDP o Partner Room y transferir foco.
     Usada tanto por el endpoint como por el callback de hover.
     """
     try:
-        # Buscar por proceso mstsc.exe (Remote Desktop Connection)
-        rdp_windows = window_manager.get_windows_by_process('mstsc.exe')
-        rdp_hwnds = set(w['hwnd'] for w in rdp_windows)
+        use_partner_room = get_use_partner_room()
         
-        # También buscar por título que contenga patrones comunes de RDP
-        title_patterns = ['Remote Desktop', 'Escritorio remoto', 'Conexión a Escritorio remoto']
-        for pattern in title_patterns:
-            title_matches = window_manager.get_windows_by_title(pattern)
-            for w in title_matches:
-                if w['hwnd'] not in rdp_hwnds:
-                    rdp_windows.append(w)
-                    rdp_hwnds.add(w['hwnd'])
+        if use_partner_room:
+            # Buscar Windows App de Partner Room
+            # Buscar por título que contenga "Partner Room"
+            title_patterns = ['Partner Room', 'PartnerRoom']
+            target_windows = []
+            target_hwnds = set()
+            
+            for pattern in title_patterns:
+                title_matches = window_manager.get_windows_by_title(pattern)
+                for w in title_matches:
+                    if w['hwnd'] not in target_hwnds:
+                        target_windows.append(w)
+                        target_hwnds.add(w['hwnd'])
+        else:
+            # Buscar por proceso mstsc.exe (Remote Desktop Connection)
+            rdp_windows = window_manager.get_windows_by_process('mstsc.exe')
+            target_hwnds = set(w['hwnd'] for w in rdp_windows)
+            target_windows = rdp_windows
+            
+            # También buscar por título que contenga patrones comunes de RDP
+            title_patterns = ['Remote Desktop', 'Escritorio remoto', 'Conexión a Escritorio remoto']
+            for pattern in title_patterns:
+                title_matches = window_manager.get_windows_by_title(pattern)
+                for w in title_matches:
+                    if w['hwnd'] not in target_hwnds:
+                        target_windows.append(w)
+                        target_hwnds.add(w['hwnd'])
         
-        if not rdp_windows:
+        if not target_windows:
             return {"minimized_count": 0, "focus_transferred": False}
         
-        # Minimizar todas las ventanas RDP encontradas
+        # Minimizar todas las ventanas encontradas
         minimized_count = 0
-        for window in rdp_windows:
+        for window in target_windows:
             if window_manager.minimize_window(window['hwnd']):
                 minimized_count += 1
         
@@ -140,6 +157,19 @@ def ui_auto_hide_rdp():
         enabled = bool(data.get('enabled', False))
         set_auto_hide_rdp(enabled)
         return jsonify({"status": "ok", "auto_hide_rdp": enabled})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/ui/target-app', methods=['POST'])
+def ui_target_app():
+    """
+    Configura si se debe buscar Partner Room (true) o Remote Desktop (false).
+    """
+    try:
+        data = request.get_json() or {}
+        use_partner_room = bool(data.get('use_partner_room', False))
+        set_use_partner_room(use_partner_room)
+        return jsonify({"status": "ok", "use_partner_room": use_partner_room})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 

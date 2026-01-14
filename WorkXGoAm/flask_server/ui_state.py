@@ -6,6 +6,7 @@ _face_hover: bool = False
 _popup_hover: bool = False
 _face_rect: Optional[Tuple[int, int, int, int]] = None
 _auto_hide_rdp: bool = False
+_use_partner_room: bool = False
 
 # Callback para ejecutar cuando face_hover se activa con auto_hide_rdp
 _on_face_hover_with_auto: Optional[Callable[[], None]] = None
@@ -41,6 +42,15 @@ def get_auto_hide_rdp() -> bool:
     return _auto_hide_rdp
 
 
+def set_use_partner_room(value: bool) -> None:
+    global _use_partner_room
+    _use_partner_room = bool(value)
+
+
+def get_use_partner_room() -> bool:
+    return _use_partner_room
+
+
 def set_on_face_hover_callback(callback: Optional[Callable[[], None]]) -> None:
     """Registra un callback que se ejecutará cuando el mouse entre al sol con auto activo."""
     global _on_face_hover_with_auto
@@ -53,6 +63,7 @@ def get_state() -> dict:
         "popup_hover": _popup_hover,
         "face_rect": _face_rect,
         "auto_hide_rdp": _auto_hide_rdp,
+        "use_partner_room": _use_partner_room,
     }
 
 

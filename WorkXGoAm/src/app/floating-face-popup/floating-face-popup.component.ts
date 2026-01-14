@@ -15,6 +15,15 @@ import { Component, OnInit } from '@angular/core'
         <span class="label">Auto</span>
       </label>
     </div>
+    <div class="app-selector-row">
+      <span class="selector-label">Target App:</span>
+      <label class="app-switch">
+        <input type="checkbox" [checked]="usePartnerRoom" (change)="toggleTargetApp()">
+        <span class="slider"></span>
+        <span class="label-left">Remote Desktop</span>
+        <span class="label-right">Partner Room</span>
+      </label>
+    </div>
     <div class="placeholder">Floating Face Popup (sin contenido)</div>
   </div>
   `,
@@ -33,6 +42,21 @@ import { Component, OnInit } from '@angular/core'
       display: flex;
       align-items: center;
       gap: 12px;
+    }
+    .app-selector-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 16px;
+      padding: 8px 16px;
+      background: #f8f9fa;
+      border-radius: 8px;
+    }
+    .selector-label {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      font-size: 12px;
+      font-weight: 600;
+      color: #333;
     }
     .hide-rdp-btn {
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -96,6 +120,58 @@ import { Component, OnInit } from '@angular/core'
       font-weight: 500;
       color: #555;
     }
+    .app-switch {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      user-select: none;
+      position: relative;
+    }
+    .app-switch input {
+      display: none;
+    }
+    .app-switch .slider {
+      width: 44px;
+      height: 22px;
+      background: #4a90e2;
+      border-radius: 11px;
+      position: relative;
+      transition: background 0.2s ease;
+    }
+    .app-switch .slider::after {
+      content: '';
+      position: absolute;
+      width: 18px;
+      height: 18px;
+      background: #fff;
+      border-radius: 50%;
+      top: 2px;
+      left: 2px;
+      transition: transform 0.2s ease;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    }
+    .app-switch input:checked + .slider {
+      background: #27ae60;
+    }
+    .app-switch input:checked + .slider::after {
+      transform: translateX(22px);
+    }
+    .app-switch .label-left,
+    .app-switch .label-right {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      font-size: 11px;
+      font-weight: 500;
+      color: #555;
+    }
+    .app-switch input:not(:checked) ~ .label-left {
+      font-weight: 700;
+      color: #4a90e2;
+    }
+    .app-switch input:checked ~ .label-right {
+      font-weight: 700;
+      color: #27ae60;
+    }
     .placeholder {
       color: #888;
       font-family: 'Segoe UI', Arial, sans-serif;
@@ -106,6 +182,7 @@ import { Component, OnInit } from '@angular/core'
 })
 export class FloatingFacePopupComponent implements OnInit {
   autoMode = false;
+  usePartnerRoom = false;
 
   async ngOnInit() {
     // Cargar estado inicial del servidor
@@ -114,6 +191,7 @@ export class FloatingFacePopupComponent implements OnInit {
       const data = await res.json()
       if (data.status === 'ok' && data.data) {
         this.autoMode = !!data.data.auto_hide_rdp
+        this.usePartnerRoom = !!data.data.use_partner_room
       }
     } catch {}
   }
@@ -126,6 +204,18 @@ export class FloatingFacePopupComponent implements OnInit {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ enabled: this.autoMode })
+      })
+    } catch {}
+  }
+
+  async toggleTargetApp() {
+    this.usePartnerRoom = !this.usePartnerRoom
+    // Sincronizar con el servidor
+    try {
+      await fetch('http://127.0.0.1:8080/ui/target-app', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ use_partner_room: this.usePartnerRoom })
       })
     } catch {}
   }
